@@ -1,0 +1,16 @@
+{
+    "wgroups": [
+        {
+            "name": "win",
+            "presets": ["win-dev", "fast-clangcl"],
+            "terminal": ["cmd"]
+        }, 
+        {
+            "name": "linux",
+            "presets": ["linux-dev", "fast-mingw", "fast-clang"],
+            "terminal": ["wsl"]
+        }
+    ],
+    "alwaysInvalidate": false
+
+}

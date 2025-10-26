@@ -12,7 +12,7 @@ import (
 var cmexlVer = "0.1.0.0"
 
 var rootCmd = &cobra.Command{
-	Use:   "cmexl",
+	Use:   "cmexl [command]",
 	Short: "Autorunner for CMake presets",
 	Long: `Automatically runs and records CMake workflow outputs for your CMake presets:`,
 	Version: cmexlVer,
