@@ -45,7 +45,7 @@ func getCmakePresetsE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if allArgFound {
+	if allArgFound || len(args) == 0 {
 		if err := printPresets(cmd, cmutils.All); err != nil {
 			return err
 		}
