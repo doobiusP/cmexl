@@ -22,8 +22,7 @@ func printPresets(cmd *cobra.Command, prType cmutils.Preset_t) error {
 	}
 	if namesOnly {
 		for prKey := range prMap {
-			prKeyTypeStr, _ := prKey.Type.String()
-			fmt.Printf("(%s, %s)\n", prKey.Name, prKeyTypeStr)
+			fmt.Printf("(%s, %s)\n", prKey.Name, prKey.Type.String())
 		}
 	} else {
 		for _, prVal := range prMap {
@@ -51,7 +50,7 @@ func getCmakePresetsE(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		for _, arg := range args {
-			prType, prErr := cmutils.MapPresetToType(arg)
+			prType, prErr := cmutils.PresetStrToType(arg)
 			if prErr != nil {
 				return prErr
 			}
