@@ -5,8 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math"
+	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -54,17 +57,23 @@ func (e CmexlEvent) String() string {
 	return fmt.Sprintf("[%s:%s](%s) Elapsed time: %v, Log: %s", e.Key.Name, e.Key.Type.String(), e.Type.String(), e.Data.ElapsedTime, e.Data.Log)
 }
 
+var (
+	cmexlRegex           = regexp.MustCompile(`\[CMEXL\]\s*(?P<log>.*)$`)
+	vcpkgPkgDetailsRegex = regexp.MustCompile(`(?P<package>[\w\-]+(?:\[[^\]]*\])?):(?P<triplet>[\w\-]+)@(?P<version>[\w\.\-\+]+)(?:#(?P<patch>\d+))?`)
+)
+
 func TrySend(events chan<- CmexlEvent, event CmexlEvent) {
 	select {
 	case events <- event:
 	default:
+		fmt.Printf("overflow")
 		return
 	}
 }
 
 var defaultTickerFreq = float32(5.0)
 var tickerFreq = float32(10.0)
-var defaultEventChScale = 10
+var defaultEventChScale = 100
 
 func getCmakeCommand(ctx context.Context, prKey PresetInfoKey) (*exec.Cmd, error) {
 	var cmakeArgs []string
@@ -127,6 +136,60 @@ func reportCMakeErr(err error, eventsCh chan<- CmexlEvent, prKey PresetInfoKey) 
 	TrySend(eventsCh, cmakeErrEvent)
 }
 
+var (
+	matchLog     *os.File
+	matchLogOnce sync.Once
+)
+
+func initMatchLog() {
+	var err error
+	matchLog, err = os.OpenFile("matched_lines.log",
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatalf("cannot create matched_lines.log: %v", err)
+	}
+}
+
+/* ---------- your existing handler ---------- */
+func handleLine(line string, eventsCh chan<- CmexlEvent, prKey PresetInfoKey) {
+	sendLogUpdate := func(logLine string) {
+		cmakeLogEventData := CmexlEventData{Log: logLine, ElapsedTime: -1}
+		cmakeLogEvent := CmexlEvent{Key: prKey, Type: LogLineUpdate, Data: cmakeLogEventData, Result: nil}
+		TrySend(eventsCh, cmakeLogEvent)
+	}
+
+	matchLogOnce.Do(initMatchLog) // ensure file opened exactly once
+	someMatch := false
+
+	if match := cmexlRegex.FindStringSubmatch(line); match != nil {
+		logIdx := cmexlRegex.SubexpIndex("log")
+		out := match[logIdx]
+		sendLogUpdate(out)
+		fmt.Fprintln(matchLog, out) // <<<<< write to file
+		someMatch = true
+	}
+
+	if match := vcpkgPkgDetailsRegex.FindStringSubmatch(line); match != nil {
+		pkgIdx := vcpkgPkgDetailsRegex.SubexpIndex("package")
+		versionIdx := vcpkgPkgDetailsRegex.SubexpIndex("version")
+		patchIdx := vcpkgPkgDetailsRegex.SubexpIndex("patch")
+
+		patchStr := match[patchIdx]
+		if patchStr == "" {
+			patchStr = "/NA"
+		}
+		out := fmt.Sprintf("Now processing %s @ %s with vcpkg patch %s",
+			match[pkgIdx], match[versionIdx], patchStr)
+		sendLogUpdate(out)
+		fmt.Fprintln(matchLog, out) // <<<<< write to file
+		someMatch = true
+	}
+	if !someMatch {
+
+	}
+	// unmatched lines ignored for now
+}
+
 func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, wg *sync.WaitGroup) (PresetInfoKey, error) {
 	cmakeCmd, err := getCmakeCommand(parentCtx, prKey)
 	if err != nil {
@@ -142,16 +205,27 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 		return prKey, fmt.Errorf("failed to start cmake: %w", err)
 	}
 
+	filename := fmt.Sprintf(".cmexl/%s.log", prKey.Name)
+	file, err := os.Create(filename)
+	if err != nil {
+		return prKey, err
+	}
+	buildLogger := bufio.NewWriterSize(file, 1*1024)
+
 	stopTicker := startCmakeTicker(parentCtx, eventsCh, prKey, tickerFreq)
 
 	// Handles shutdown mechanics of the CMake Cmd
 	go func() {
 		defer stopTicker()
 		defer wg.Done()
+		defer func() {
+			buildLogger.Flush()
+			file.Close()
+			stdout.Close()
+		}()
 		err := cmakeCmd.Wait()
 		select {
 		case <-parentCtx.Done():
-			stdout.Close()
 			if cmakeCmd.Process != nil {
 				_ = cmakeCmd.Process.Kill()
 				reportCMakeErr(parentCtx.Err(), eventsCh, prKey)
@@ -165,7 +239,6 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 				TrySend(eventsCh, cmakeFinEvent)
 			}
 		}
-
 	}()
 
 	go func() {
@@ -175,13 +248,28 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 
 		for sc.Scan() {
 			line := sc.Text()
+
+			if buildLogger.Available() < len(line) {
+				err := buildLogger.Flush()
+				if err != nil {
+					reportCMakeErr(err, eventsCh, prKey)
+				}
+			}
+			bytesWritten, err := buildLogger.WriteString(line)
+			if bytesWritten < len(line) {
+				reportCMakeErr(err, eventsCh, prKey)
+			}
+
+			err = buildLogger.WriteByte('\n')
+			if err != nil {
+				reportCMakeErr(err, eventsCh, prKey)
+			}
+
 			select {
 			case <-parentCtx.Done():
 				return
 			default:
-				cmakeLogEventData := CmexlEventData{Log: line, ElapsedTime: -1}
-				cmakeLogEvent := CmexlEvent{Key: prKey, Type: LogLineUpdate, Data: cmakeLogEventData, Result: nil}
-				TrySend(eventsCh, cmakeLogEvent)
+				handleLine(line, eventsCh, prKey)
 			}
 		}
 		if err := sc.Err(); err != nil {
@@ -205,7 +293,7 @@ func init() {
 	logDoubleBuffer[1] = make(map[PresetInfoKey]presetState)
 }
 
-func updateState(ev CmexlEvent, errReport map[PresetInfoKey]error) {
+func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error) {
 	cur := activeIndex.Load()
 	next := (cur + 1) % 2
 
@@ -218,7 +306,7 @@ func updateState(ev CmexlEvent, errReport map[PresetInfoKey]error) {
 		s := logDoubleBuffer[cur][ev.Key]
 		s.Log = ev.Data.Log
 		logDoubleBuffer[next][ev.Key] = s
-		errReport[ev.Key] = ev.Result
+		errReport[ev.Key] = append(errReport[ev.Key], ev.Result)
 	case ExecFinished, LogLineUpdate:
 		s := logDoubleBuffer[cur][ev.Key]
 		s.Log = ev.Data.Log
@@ -282,12 +370,16 @@ func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}) {
 			return
 		case <-ticker.C:
 			render()
-
 		}
 	}
 }
 
 func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey) error {
+	err := CreateCmexlStore()
+	if err != nil {
+		return err
+	}
+
 	prMap, prErr := GetCmakePresets(prType)
 	if prErr != nil {
 		return prErr
@@ -309,16 +401,25 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	errReport := make(map[PresetInfoKey]error)
+	errReport := make(map[PresetInfoKey][]error)
 
 	for _, key := range prKeys {
 		// TODO: For now force all presets to fail if any one fails. Later make it redundant
 		if _, ok := prMap[key]; !ok {
-			errReport[key] = errors.New("can't find preset for this preset-type")
+			errReport[key] = append(errReport[key], errors.New("can't find preset for this preset-type"))
 		}
+		/*
+			url=https://github.com/microsoft/vcpkg-tool/blob/4819c236bb6a9e51be6e46a226683a64b11fc409/include/vcpkg/base/message-data.inc.h
+			DECLARE_MESSAGE(PackagesToInstall, (), "", "The following packages will be built and installed:")
+			DECLARE_MESSAGE(PackagesToModify, (), "", "Additional packages (*) will be modified to complete this operation.")
+			DECLARE_MESSAGE(PackagesToRebuild, (), "", "The following packages will be rebuilt:")
+			DECLARE_MESSAGE(PackagesToRemove, (), "", "The following packages will be removed:")
+			// TODO: Sort in ascending order of work
+			// `(?P<package>[\w\-]+(?:\[[^\]]*\])?):(?P<triplet>[\w\-]+)@(?P<version>[\w\.\-\+]+)(?:#(?P<patch>\d+))?
+		*/
 		prKey, err := startCMakeCommand(ctx, eventsCh, key, &wg)
 		if err != nil {
-			errReport[key] = fmt.Errorf("{%s, %s}: %w", prKey.Name, prKey.Type.String(), err)
+			errReport[key] = append(errReport[key], fmt.Errorf("{%s, %s}: %w", prKey.Name, prKey.Type.String(), err))
 		}
 	}
 
@@ -353,9 +454,15 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey) error {
 
 	fmt.Println("Error Report")
 	fmt.Println("==============")
-	for _, k := range keys {
-		if err := errReport[k]; err != nil {
-			fmt.Printf("%s (%v): %v\n", k.Name, k.Type, err)
+	if len(keys) <= 0 {
+		fmt.Print("None")
+	} else {
+		for _, k := range keys {
+			if err := errReport[k]; err != nil {
+				for each_err := range err {
+					fmt.Printf("%s (%v): %v\n", k.Name, k.Type, each_err)
+				}
+			}
 		}
 	}
 	return nil

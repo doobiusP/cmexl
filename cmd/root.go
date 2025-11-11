@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -12,9 +9,9 @@ import (
 var cmexlVer = "0.1.0.0"
 
 var rootCmd = &cobra.Command{
-	Use:   "cmexl [command]",
-	Short: "Autorunner for CMake presets",
-	Long: `Automatically runs and records CMake workflow outputs for your CMake presets:`,
+	Use:     "cmexl [command]",
+	Short:   "Autorunner for CMake presets",
+	Long:    `Automatically runs and records CMake workflow outputs for your CMake presets:`,
 	Version: cmexlVer,
 }
 
@@ -28,5 +25,3 @@ func Execute() {
 func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
-
-

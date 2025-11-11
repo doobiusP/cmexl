@@ -1,16 +1,16 @@
 {
-    "wgroups": [
+    "init_settings": {
+        "name": "App",
+        "short-name": "myapp",
+        "template": "cpp-glfw",
+        "using-vcpkg": true,
+        "configs": ["Debug", "Release", "RelWithDebInfo", "MinSizeRel"]
+    },
+    "groups": [
         {
-            "name": "win",
-            "presets": ["win-dev", "fast-clangcl"],
-            "terminal": ["cmd"]
-        }, 
-        {
-            "name": "linux",
-            "presets": ["linux-dev", "fast-mingw", "fast-clang"],
-            "terminal": ["wsl"]
+            "name": "most",
+            "powershell": ["win-dev", "win-rel"],
+            "wsl": ["linux-dev", "fast-mingw", "fast-clang"]
         }
-    ],
-    "alwaysInvalidate": false
-
+    ]
 }
