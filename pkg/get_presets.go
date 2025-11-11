@@ -29,7 +29,7 @@ func extractPresets(prType Preset_t, path string, prMap map[PresetInfoKey]Preset
 	}
 	for _, preset := range currPresetList {
 		if len(preset.DisplayName) == 0 {
-			preset.DisplayName = "-UNKNOWN-"
+			preset.DisplayName = "-"
 		}
 		preset.File = path
 		preset.Type = prType

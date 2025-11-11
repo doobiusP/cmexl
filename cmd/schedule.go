@@ -3,6 +3,7 @@ package cmd
 import (
 	cmutils "cmexl/pkg"
 	"errors"
+	"fmt"
 
 	"github.com/spf13/cobra"
 )
@@ -15,24 +16,30 @@ func execPresetsE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	prMap, prErr := cmutils.GetCmakePresets(prType)
+	if prErr != nil {
+		return prErr
+	}
+
 	if len(args) < 1 {
 		return errors.New("no arguments provided")
 	}
-
 	var prList []cmutils.PresetInfoKey
 	for _, arg := range args {
 		prKey := cmutils.PresetInfoKey{Name: arg, Type: prType}
+		if _, ok := prMap[prKey]; !ok {
+			return fmt.Errorf("%s does not correspond to preset type %s", arg, prType.String())
+		}
 		prList = append(prList, prKey)
 	}
 
-	err = cmutils.ScheduleCmakePresets(prType, prList)
+	err = cmutils.ScheduleCmakePresets(prType, prList, prMap)
 	return err
 }
 
 var scheduleCmd = &cobra.Command{
 	Use:   "schedule <preset-name> | subcommand",
 	Short: "Schedule preset(s) for execution",
-	Long:  `Schedule preset(s) for execution according to configuration rules set in cmexlconf.json`,
 	RunE:  execPresetsE,
 	Args:  cobra.MinimumNArgs(1),
 }

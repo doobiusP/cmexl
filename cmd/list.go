@@ -2,6 +2,7 @@ package cmd
 
 import (
 	cmutils "cmexl/pkg"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -17,15 +18,33 @@ func printPresets(cmd *cobra.Command, prType cmutils.Preset_t) error {
 	if namesOnlyPError != nil {
 		return fmt.Errorf("%v", namesOnlyPError)
 	}
+
+	var presetDetails []map[string]interface{}
+
 	if namesOnly {
 		for prKey := range prMap {
-			fmt.Printf("(%s, %s)\n", prKey.Name, prKey.Type.String())
+			presetDetails = append(presetDetails, map[string]interface{}{
+				"name": prKey.Name,
+				"type": prKey.Type.String(),
+			})
 		}
 	} else {
 		for _, prVal := range prMap {
-			fmt.Printf("(%s)\n", prVal.String())
+			presetDetails = append(presetDetails, map[string]interface{}{
+				"name":    prVal.Name,
+				"display": prVal.DisplayName,
+				"type":    prVal.Type.String(),
+				"file":    prVal.File,
+			})
 		}
 	}
+
+	jsonData, err := json.MarshalIndent(presetDetails, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %v", err)
+	}
+
+	fmt.Println(string(jsonData))
 	return nil
 }
 

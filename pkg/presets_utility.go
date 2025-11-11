@@ -91,6 +91,14 @@ type PresetInfo struct {
 	Type        Preset_t
 }
 
+type PresetState struct {
+	VcpkgRunning               bool
+	VcpkgReadingInstalled      bool
+	VcpkgReadingNeeded         bool
+	VcpkgAlreadyInstalledCount int16
+	VcpkgNeedInstalledCount    int16
+}
+
 func (pr Preset_t) String() string {
 	switch pr {
 	case Configure:

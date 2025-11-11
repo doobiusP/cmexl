@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Start local cmexl metadata store",
@@ -18,15 +17,4 @@ var initCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	/*
-		Flags:
-			--no-vcpkg
-			--template {<read-from-templates-dir>}
-			--name <name-of-project>
-			--add-support [mingw64, clang]
-			--add-platform [linux, windows]
-			--version <ver>
-			--git-init
-			--configs {...}
-	*/
 }

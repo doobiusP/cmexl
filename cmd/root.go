@@ -6,12 +6,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmexlVer = "0.1.0.0"
+var cmexlVer = "0.2.0.0"
 
 var rootCmd = &cobra.Command{
 	Use:     "cmexl [command]",
-	Short:   "Autorunner for CMake presets",
-	Long:    `Automatically runs and records CMake workflow outputs for your CMake presets:`,
+	Short:   "Project bootstrapper & parallel build runner for CMake/C++ projects",
 	Version: cmexlVer,
 }
 
