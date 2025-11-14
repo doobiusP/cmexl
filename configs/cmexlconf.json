@@ -4,13 +4,57 @@
         "short-name": "myapp",
         "template": "cpp-glfw",
         "using-vcpkg": true,
-        "configs": ["Debug", "Release", "RelWithDebInfo", "MinSizeRel"]
+        "configs": [
+            "Debug",
+            "Release",
+            "RelWithDebInfo",
+            "MinSizeRel"
+        ]
     },
     "groups": [
         {
-            "name": "most",
-            "powershell": ["win-dev", "win-rel"],
-            "wsl": ["linux-dev", "fast-mingw", "fast-clang"]
+            "name": "win-pkg-check",
+            "prescript": "",
+            "postscript": "",
+            "presets": [
+                {
+                    "name": "x64-vs-msvc-vcpkg-check",
+                    "type": "configure"
+                },
+                {
+                    "name": "x86-vs-msvc-vcpkg-check",
+                    "type": "configure"
+                },
+                {
+                    "name": "x86-vs-clangcl-vcpkg-check",
+                    "type": "configure"
+                },
+                {
+                    "name": "x64-vs-clangcl-vcpkg-check",
+                    "type": "configure"
+                }
+            ]
+        },
+        {
+            "name": "win",
+            "prescript": "",
+            "postscript": "",
+            "presets": [
+                {
+                    "name": "win-dev",
+                    "type": "workflow"
+                },
+                {
+                    "name": "win-rel",
+                    "type": "workflow"
+                }
+            ]
         }
-    ]
+    ],
+    "tasks": {
+        "win": [
+            "win",
+            "win-pkg-check"
+        ]
+    }
 }
