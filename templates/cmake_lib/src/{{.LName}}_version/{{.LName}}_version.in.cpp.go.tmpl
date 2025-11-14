@@ -1,0 +1,34 @@
+#include <{{.LName}}/version.h>
+
+namespace Doobius
+{
+    std::string get_version()
+    {
+        return "@{{.Name}}_VERSION@";
+    }
+    unsigned get_major_version()
+    {
+        return @{{.Name}}_VERSION_MAJOR@;
+    }
+    unsigned get_minor_version()
+    {
+        return @{{.Name}}_VERSION_MINOR@+0;
+    }
+    unsigned get_tweak_version()
+    {
+        return @{{.Name}}_VERSION_PATCH@+0;
+    }
+    unsigned get_patch_version()
+    {
+        return @{{.Name}}_VERSION_TWEAK@+0;
+    }
+
+    std::string get_commit_hash() {
+        return "@LAST_COMMIT_HASH@";
+    }
+    
+    unsigned int get_commits_since_version_change()
+    {
+        return @NUM_COMMITS_AFTER_VER_COMMIT@ + 0;
+    }
+}

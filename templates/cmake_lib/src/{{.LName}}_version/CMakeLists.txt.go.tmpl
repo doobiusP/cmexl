@@ -1,0 +1,33 @@
+message(VERBOSE "[CMEXL] Now processing ${CMAKE_CURRENT_LIST_FILE}")
+
+add_library({{.SName}}_Version STATIC)
+add_library(${LIBRARY_ALIAS}::ver ALIAS {{.SName}}_BuildSettings)
+
+find_package(Git REQUIRED)
+execute_process(
+	COMMAND ${GIT_EXECUTABLE} rev-list -1 HEAD cmake/{{.LName}}_version.cmake
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	OUTPUT_VARIABLE LAST_COMMIT_HASH
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+	COMMAND_ERROR_IS_FATAL ANY
+)
+
+execute_process(
+	COMMAND ${GIT_EXECUTABLE} rev-list --count ${LAST_COMMIT_HASH}..HEAD
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	OUTPUT_VARIABLE NUM_COMMITS_AFTER_VER_COMMIT
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+	COMMAND_ERROR_IS_FATAL ANY
+)
+
+configure_file({{.LName}}_version.in.cpp {{.LName}}_version.cpp @ONLY)
+
+target_sources({{.SName}}_BuildSettings
+	PRIVATE
+	${CMAKE_CURRENT_BINARY_DIR}/{{.LName}}_version.cpp
+)
+
+target_link_libraries({{.SName}}_BuildSettings
+	PRIVATE
+	${LIBRARY_ALIAS}::proj_build
+)

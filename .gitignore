@@ -30,6 +30,4 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
-
-CMakePresets.json
 *cmexl*

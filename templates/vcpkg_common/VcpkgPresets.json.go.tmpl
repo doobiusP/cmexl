@@ -1,0 +1,168 @@
+{{ /* Go Template */ }}
+{
+  "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+  "version": 10,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 16,
+    "patch": 0
+  },
+  "$comment": [
+    "You will need CMake version 3.31 or higher in order to use this CMakePresets.json.",
+    "For lesser cmake versions, just manually list the variables below into the command line invocation of cmake.",
+    "Note that paths will have to be manually specified since {sourceDir} and other variables will no longer be available.",
+    "Both Release and Debug will be downloaded by default",
+    "Feel free to edit"
+  ],
+  "configurePresets": [
+    {
+      "name": "vcpkg-base",
+      "hidden": true,
+      "environment": {
+        "VCPKG_ROOT": "$penv{VCPKG_ROOT}"
+      },
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "{{.UName}}_USE_VCPKG": "ON",
+        "{{.UName}}_PRESET_NAME": "${presetName}",
+        "VCPKG_INSTALLED_DIR": "vcpkg_local/${presetName}/vcpkg_installed",
+        "VCPKG_MANIFEST_FEATURES": "main"
+      }
+    },
+    {
+      "name": "vcpkg-check-base",
+      "inherits": "vcpkg-base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/out/check-pkg-mgr/build/${presetName}",
+      "installDir": "${sourceDir}/out/check-pkg-mgr/install/${presetName}",
+      "cacheVariables": {
+        "VCPKG_MANIFEST_FEATURES": "package-manager-test"
+      }
+    },
+    {
+      "name": "x64-vs-msvc-vcpkg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Visual Studio w/ MSVC (x64)(Check)",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "CMAKE_GENERATOR_PLATFORM": "x64",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+      }
+    },
+    {
+      "name": "x86-vs-msvc-vcpkg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Visual Studio w/ MSVC (x86)(Check)",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "CMAKE_GENERATOR_PLATFORM": "Win32",
+        "VCPKG_TARGET_TRIPLET": "x86-windows-static-md"
+      }
+    },
+    {
+      "$comment": [
+        "Make sure to pull in the git submodule for my-vcpkg-triplets in order for this to work"
+      ],
+      "name": "x64-vs-clangcl-vcpkg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Visual Studio w/ ClangCL (x64)(Check)",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "CMAKE_GENERATOR_PLATFORM": "x64",
+        "VCPKG_TARGET_TRIPLET": "x64-win-llvm-static-md",
+        "CMAKE_GENERATOR_TOOLSET": "ClangCL"
+      }
+    },
+    {
+      "$comment": [
+        "Make sure to pull in the git submodule for my-vcpkg-triplets in order for this to work"
+      ],
+      "name": "x86-vs-clangcl-vcpkg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Visual Studio w/ ClangCL (x86)(Check)",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "CMAKE_GENERATOR_PLATFORM": "Win32",
+        "VCPKG_TARGET_TRIPLET": "x86-win-llvm",
+        "CMAKE_GENERATOR_TOOLSET": "ClangCL"
+      }
+    },
+    {
+      "name": "x64-linux-gcc-dbg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Ninja w/ GCC (x64)(Debug)(Check)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake"
+      }
+    },
+    {
+      "name": "x64-linux-gcc-rel-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Ninja w/ GCC (x64)(Release)(Check)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake"
+      }
+    },
+    {
+      "name": "x86-linux-gcc-dbg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Ninja w/ GCC (x86)(Debug)(Check)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x86-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x86-linux-static-md.toolchain.cmake"
+      }
+    },
+    {
+      "name": "x86-linux-gcc-rel-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Ninja w/ GCC (x86)(Release)(Check)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VCPKG_TARGET_TRIPLET": "x86-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x86-linux-static-md.toolchain.cmake"
+      }
+    },
+    {
+      "name": "x64-linux-clang-dbg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Ninja w/ Clang (x64)(Debug)(Check)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-linux-llvm-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-llvm-static-md.toolchain.cmake"
+      }
+    },
+    {
+      "name": "x64-mingw64-dbg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Ninja w/ x86_64-w64-mingw32-g++ (x64)(Debug)(Check)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x64-mingw64-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-mingw64-static-md.toolchain.cmake"
+      }
+    },
+    {
+      "name": "x86-mingw64-dbg-check",
+      "inherits": "vcpkg-check-base",
+      "displayName": "Ninja w/ i686-w64-mingw32-g++ (x86)(Debug)(Check)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x86-mingw64-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x86-mingw64-static-md.toolchain.cmake"
+      }
+    }
+  ]
+}

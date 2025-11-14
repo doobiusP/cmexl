@@ -1,0 +1,13 @@
+#pragma once
+#include <string>
+
+namespace {{.SName}} {
+    std::string get_version();
+    unsigned int get_major_version();
+    unsigned int get_minor_version();
+    unsigned int get_patch_version();
+    unsigned int get_tweak_version();
+
+    std::string get_commit_hash();
+    unsigned int get_commits_since_version_change();
+}

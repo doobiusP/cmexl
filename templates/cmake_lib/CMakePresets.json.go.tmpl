@@ -1,3 +1,4 @@
+{{ /* Go Template */ }}
 {
   "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
   "version": 10,
@@ -10,102 +11,114 @@
     "You will need CMake version 3.31 or higher in order to use this CMakePresets.json.",
     "For lesser cmake versions, just manually list the variables below into the command line invocation of cmake.",
     "Note that paths will have to be manually specified since {sourceDir} and other variables will no longer be available.",
-    "The 2 presets listed below are the default workflows for Windows and Linux. Create new ones in CMakeUserPresets.json as required"
+    "Feel free to edit"
   ],
   "include": [
-    "PkgMgrPresets.json"
+{{ if .UseVcpkg }}
+    "VcpkgPresets.json"
+{{ end }}
   ],
   "configurePresets": [
     {
-      "name": "vs-vcpkg-base",
-      "hidden": true,
-      "inherits": "vcpkg-base",
-      "generator": "Visual Studio 17 2022",
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
+      "name": "base",
+      "cacheVariables": {
+        "{{.UName}}_PRESET_NAME": "${presetName}"
       }
     },
     {
-      "$comment": [
-        "Check Release and Debug here"
-      ],
       "name": "vs-msvc",
-      "inherits": "vs-vcpkg-base",
+{{if .UseVcpkg}}
+"inherits": "vcpkg-base",
+{{else}}
+"inherits": "base",
+{{end}}
+      "generator": "Visual Studio 17 2022",
       "displayName": "Visual Studio w/ MSVC (x64)",
       "cacheVariables": {
         "CMAKE_GENERATOR_PLATFORM": "x64",
         "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
-        "DOOBIUS_COPY_VCPKG_INCLUDE": "OFF",
-        "DOOBIUS_BUILD_TESTS": "ON"
+        "{{.UName}}_BUILD_TESTS": "ON"
       }
     },
     {
-      "$comment": [
-        "Check Release and Debug here"
-      ],
       "name": "x86-vs-msvc",
-      "inherits": "vs-vcpkg-base",
+{{if .UseVcpkg}}
+"inherits": "vcpkg-base",
+{{else}}
+"inherits": "base",
+{{end}}
+      "generator": "Visual Studio 17 2022",
       "displayName": "Visual Studio w/ MSVC (x86)",
       "cacheVariables": {
         "CMAKE_GENERATOR_PLATFORM": "Win32",
         "VCPKG_TARGET_TRIPLET": "x86-windows-static-md",
-        "DOOBIUS_BUILD_TESTS": "ON"
+        "{{.UName}}_BUILD_TESTS": "ON"
       }
     },
     {
       "name": "x64-linux-dbg-gcc",
-      "inherits": "vcpkg-base",
+{{if .UseVcpkg}}
+"inherits": "vcpkg-base",
+{{else}}
+"inherits": "base",
+{{end}}
       "displayName": "Ninja w/ GCC (x64)(Debug)",
       "generator": "Ninja",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/doobius-triplets/x64-linux-static-md.toolchain.cmake",
-        "DOOBIUS_BUILD_TESTS": "ON",
-        "DOOBIUS_USE_ADDR2LINE": "ON",
-        "DOOBIUS_USE_BACKTRACE": "ON",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake",
+        "{{.UName}}_BUILD_TESTS": "ON",
+        "{{.UName}}_USE_BACKTRACE": "ON",
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
       "name": "x64-linux-rel-gcc",
-      "inherits": "vcpkg-base",
+{{if .UseVcpkg}}
+"inherits": "vcpkg-base",
+{{else}}
+"inherits": "base",
+{{end}}
       "displayName": "Ninja w/ GCC (x64)(Release)",
       "generator": "Ninja",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/doobius-triplets/x64-linux-static-md.toolchain.cmake",
-        "DOOBIUS_BUILD_TESTS": "OFF",
-        "DOOBIUS_USE_ADDR2LINE": "ON",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake",
+        "{{.UName}}_USE_ADDR2LINE": "ON",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
       "name": "x64-mingw64-dbg",
-      "inherits": "vcpkg-base",
+{{if .UseVcpkg}}
+"inherits": "vcpkg-base",
+{{else}}
+"inherits": "base",
+{{end}}
       "displayName": "Ninja w/ x86_64-w64-mingw32-g++posix (x64)(Debug)",
       "generator": "Ninja",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-mingw64-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/doobius-triplets/x64-mingw64-static-md.toolchain.cmake",
-        "DOOBIUS_BUILD_TESTS": "OFF",
-        "DOOBIUS_USE_ADDR2LINE": "OFF",
-        "DOOBIUS_USE_BACKTRACE": "ON",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-mingw64-static-md.toolchain.cmake",
+        "{{.UName}}_BUILD_TESTS": "OFF",
+        "{{.UName}}_USE_BACKTRACE": "ON",
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
       "name": "x64-linux-clang-dbg",
-      "inherits": "vcpkg-base",
+{{if .UseVcpkg}}
+"inherits": "vcpkg-base",
+{{else}}
+"inherits": "base",
+{{end}}
       "displayName": "Ninja w/ Clang (x64)(Debug)(Check)",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "VCPKG_TARGET_TRIPLET": "x64-linux-llvm-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/doobius-triplets/x64-linux-llvm-static-md.toolchain.cmake",
-        "DOOBIUS_USE_ADDR2LINE": "OFF",
-        "DOOBIUS_USE_BACKTRACE": "ON"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-llvm-static-md.toolchain.cmake",
+        "{{.UName}}_USE_BACKTRACE": "ON"
       }
     }
   ],
