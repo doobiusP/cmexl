@@ -1,4 +1,4 @@
-﻿{{ /* Go Template */ }}
+﻿{{/* Go Template */}}
 cmake_minimum_required(VERSION 3.16)
 message(VERBOSE "[CMEXL] Now processing ${CMAKE_CURRENT_LIST_FILE}")
 
@@ -12,7 +12,7 @@ endif()
 
 include(cmake/{{.LName}}_options.cmake)
 
-{{ if .UseVcpkg }}
+{{if .UseVcpkg}}
 if({{.UName}}_USE_VCPKG)
   include(cmake/{{.LName}}_features.cmake)
   message(VERBOSE "[CMEXL][VCPKG] Triplet = ${VCPKG_TARGET_TRIPLET}")
@@ -20,13 +20,14 @@ if({{.UName}}_USE_VCPKG)
   message(VERBOSE "[CMEXL][VCPKG] Chainload Toolchain = ${VCPKG_CHAINLOAD_TOOLCHAIN_FILE}")
   message(VERBOSE "[CMEXL][VCPKG] Features = ${VCPKG_MANIFEST_FEATURES}")
 endif()
-{{ end }}
+{{end}}
 
 # =============== Project Init =============== #
 include(cmake/{{.LName}}_version.cmake)
 
 message(STATUS "[CMEXL] starting vcpkg")
-project({{.Name}} VERSION ${{{.UName}}_VER} LANGUAGES C CXX)
+set(PROJ_PREFIX {{.UName}})
+project({{.Name}} VERSION ${PROJ_PREFIX}_VER} LANGUAGES C CXX)
 message(STATUS "[CMEXL] vcpkg finished")
 
 # =============== Config Check =============== #

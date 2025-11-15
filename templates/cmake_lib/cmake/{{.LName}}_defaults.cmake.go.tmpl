@@ -1,4 +1,4 @@
-{{ /* Go Template */ }}
+{{/* Go Template */}}
 if(NOT CMAKE_CXX_COMPILER)
     message(FATAL_ERROR "[CMEXL][ERROR] Cannot determine C++ compiler to use")
 endif()
@@ -76,12 +76,12 @@ if({{.UName}}_USING_MINGW)
 endif()
 
 list(APPEND {{.UName}}_MSVC_OPTIONS_DEBUG
-    ${{{.UName}}_MSVC_OPTIONS_DEBUG_COMPILING}
-    ${{{.UName}}_MSVC_OPTIONS_DEBUG_DIAGNOSTICS}
+    ${${PROJ_PREFIX}_MSVC_OPTIONS_DEBUG_COMPILING}
+    ${${PROJ_PREFIX}_MSVC_OPTIONS_DEBUG_DIAGNOSTICS}
 )
 list(APPEND {{.UName}}_GNU_OPTIONS_DEBUG
-    ${{{.UName}}_GNU_OPTIONS_DEBUG_COMPILING}
-    ${{{.UName}}_GNU_OPTIONS_DEBUG_DIAGNOSTICS}
+    ${${PROJ_PREFIX}_GNU_OPTIONS_DEBUG_COMPILING}
+    ${${PROJ_PREFIX}_GNU_OPTIONS_DEBUG_DIAGNOSTICS}
 )
 # ======== Release/RelWithDebInfo/MinSizeRel Variants ======== #
 set({{.UName}}_MSVC_OPTIONS_RELEASE)
@@ -111,24 +111,24 @@ if({{.UName}}_USING_MINGW)
 endif()
 
 list(APPEND {{.UName}}_MSVC_OPTIONS_RELEASE
-    ${{{.UName}}_MSVC_OPTIONS_RELEASE_COMPILING}
-    ${{{.UName}}_MSVC_OPTIONS_RELEASE_DIAGNOSTICS}
+    ${${PROJ_PREFIX}_MSVC_OPTIONS_RELEASE_COMPILING}
+    ${${PROJ_PREFIX}_MSVC_OPTIONS_RELEASE_DIAGNOSTICS}
 )
 list(APPEND {{.UName}}_GNU_OPTIONS_RELEASE
-    ${{{.UName}}_GNU_OPTIONS_RELEASE_COMPILING}
-    ${{{.UName}}_GNU_OPTIONS_RELEASE_DIAGNOSTICS}
+    ${${PROJ_PREFIX}_GNU_OPTIONS_RELEASE_COMPILING}
+    ${${PROJ_PREFIX}_GNU_OPTIONS_RELEASE_DIAGNOSTICS}
 )
 
 message(STATUS "[CMEXL] sizeof(void*): ${CMAKE_SIZEOF_VOID_P}")
 
 message(STATUS "[CMEXL] Explicitly added flags:")
-message(STATUS "[CMEXL][FLAGS] MSVC+Debug: ${{{.UName}}_MSVC_OPTIONS_DEBUG}")
-message(STATUS "[CMEXL][FLAGS] GNU+Debug: ${{{.UName}}_GNU_OPTIONS_DEBUG}")
-message(STATUS "[CMEXL][FLAGS] MSVC+Release: ${{{.UName}}_MSVC_OPTIONS_RELEASE}")
-message(STATUS "[CMEXL][FLAGS] GNU+Release: ${{{.UName}}_GNU_OPTIONS_RELEASE}")
+message(STATUS "[CMEXL][FLAGS] MSVC+Debug: ${${PROJ_PREFIX}_MSVC_OPTIONS_DEBUG}")
+message(STATUS "[CMEXL][FLAGS] GNU+Debug: ${${PROJ_PREFIX}_GNU_OPTIONS_DEBUG}")
+message(STATUS "[CMEXL][FLAGS] MSVC+Release: ${${PROJ_PREFIX}_MSVC_OPTIONS_RELEASE}")
+message(STATUS "[CMEXL][FLAGS] GNU+Release: ${${PROJ_PREFIX}_GNU_OPTIONS_RELEASE}")
 
-message(STATUS "[CMEXL][FLAGS] MSVC+Debug linker flags: ${{{.UName}}_MSVC_OPTIONS_DEBUG_LINKING}")
-message(STATUS "[CMEXL][FLAGS] GNU+Debug linker flags: ${{{.UName}}_GNU_OPTIONS_DEBUG_LINKING}")
+message(STATUS "[CMEXL][FLAGS] MSVC+Debug linker flags: ${${PROJ_PREFIX}_MSVC_OPTIONS_DEBUG_LINKING}")
+message(STATUS "[CMEXL][FLAGS] GNU+Debug linker flags: ${${PROJ_PREFIX}_GNU_OPTIONS_DEBUG_LINKING}")
 if(CMAKE_GENERATOR MATCHES "Visual Studio")
     message(STATUS "[CMEXL][Visual Studio] Platform Name: ${CMAKE_VS_PLATFORM_NAME}")
     message(STATUS "[CMEXL][Visual Studio] Platform Version: ${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
@@ -143,19 +143,19 @@ target_compile_features({{.SName}}_BuildSettings
 target_compile_definitions({{.SName}}_BuildSettings
     INTERFACE
     {{.UName}}_PATH_TO_CONFIGS_DIR="${PROJECT_SOURCE_DIR}" #TODO: Allow a user to set this.
-    {{.UName}}_PATH_TO_OUT_LOG_DIR="${PROJECT_SOURCE_DIR}/out/build/${{{.UName}}_PRESET_NAME}/log/$<LOWER_CASE:$<CONFIG>>" #TODO: Allow a user to set this.
+    {{.UName}}_PATH_TO_OUT_LOG_DIR="${PROJECT_SOURCE_DIR}/out/build/${${PROJ_PREFIX}_PRESET_NAME}/log/$<LOWER_CASE:$<CONFIG>>" #TODO: Allow a user to set this.
     {{.UName}}_CONFIG_$<UPPER_CASE:$<CONFIG>>
 )
 
 target_compile_options({{.SName}}_BuildSettings
     INTERFACE
-    $<$<CONFIG:Debug>:$<IF:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,${{{.UName}}_MSVC_OPTIONS_DEBUG},${{{.UName}}_GNU_OPTIONS_DEBUG}>>
-    $<$<NOT:$<CONFIG:Debug>>:$<IF:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,${{{.UName}}_MSVC_OPTIONS_RELEASE},${{{.UName}}_GNU_OPTIONS_RELEASE}>>
+    $<$<CONFIG:Debug>:$<IF:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,${${PROJ_PREFIX}_MSVC_OPTIONS_DEBUG},${${PROJ_PREFIX}_GNU_OPTIONS_DEBUG}>>
+    $<$<NOT:$<CONFIG:Debug>>:$<IF:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,${${PROJ_PREFIX}_MSVC_OPTIONS_RELEASE},${${PROJ_PREFIX}_GNU_OPTIONS_RELEASE}>>
 )
 
 target_link_options({{.SName}}_BuildSettings
     INTERFACE
-    $<$<CONFIG:Debug>:$<IF:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,${{{.UName}}_MSVC_OPTIONS_DEBUG_LINKING},${{{.UName}}_GNU_OPTIONS_DEBUG_LINKING}>>
+    $<$<CONFIG:Debug>:$<IF:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,${${PROJ_PREFIX}_MSVC_OPTIONS_DEBUG_LINKING},${${PROJ_PREFIX}_GNU_OPTIONS_DEBUG_LINKING}>>
 )
 
 target_include_directories({{.SName}}_BuildSettings
