@@ -10,12 +10,12 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
-type initData struct {
-	UseVcpkg    bool
-	TemplateDir string
+type templateData struct {
+	UseVcpkg bool
 
 	Name  string
 	SName string
@@ -25,20 +25,37 @@ type initData struct {
 	Version string
 }
 
-func bootstrapTemplate(bootData *initData) error {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
+func dirExists(dir string) (bool, error) {
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return false, nil
 	}
-	destRoot := filepath.Join(cwd, bootData.Name)
-	os.MkdirAll(destRoot, 0755)
+	if err != nil {
+		return false, err
+	}
+	return info.IsDir(), nil
+}
+
+func fileExists(dir string) (bool, error) {
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return !info.IsDir(), nil
+}
+
+func defaultTemplateCopy(templateDir string, destRoot string, bootData *templateData) error {
+	warningColor := color.New(color.FgYellow)
 
 	processTemplate := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		rel, err := filepath.Rel(bootData.TemplateDir, path)
+		rel, err := filepath.Rel(templateDir, path)
 		if err != nil {
 			return err
 		}
@@ -51,7 +68,15 @@ func bootstrapTemplate(bootData *initData) error {
 			}
 			newRel := buf.String()
 			destPath = filepath.Join(destRoot, newRel)
-			err := os.MkdirAll(destPath, 0755)
+
+			exists, err := dirExists(destPath)
+			if err != nil {
+				return err
+			}
+			if exists && destPath != destRoot {
+				warningColor.Printf("%s is attempting to be created again\n", destPath)
+			}
+			err = os.MkdirAll(destPath, 0755)
 			if err != nil {
 				return err
 			}
@@ -75,21 +100,48 @@ func bootstrapTemplate(bootData *initData) error {
 			newRel := fileBuf.String()
 			newRel = strings.TrimSuffix(newRel, ".go.tmpl")
 			destPath = filepath.Join(destRoot, newRel)
-
+			exists, err := fileExists(destPath)
+			if err != nil {
+				return err
+			}
+			if exists {
+				warningColor.Printf("%s is attempting to be created again\n", destPath)
+			}
 			err = os.WriteFile(destPath, finalBuf.Bytes(), 0644)
 			if err != nil {
 				return err
 			}
 		}
-		fmt.Println(destPath)
+		fmt.Printf("Finished creating %s\n", destPath)
 		return nil
 	}
 
-	err = filepath.WalkDir(bootData.TemplateDir, processTemplate)
+	err := filepath.WalkDir(templateDir, processTemplate)
 	if err != nil {
 		return fmt.Errorf("walk error: %w", err)
 	}
 
+	return nil
+}
+
+func copyTemplates(templatesToCopy []string, bootData *templateData) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	destRoot := filepath.Join(cwd, bootData.Name)
+	fmt.Printf("Creating destination root at %s\n", destRoot)
+	err = os.MkdirAll(destRoot, 0755)
+	if err != nil {
+		return err
+	}
+	for _, templateDir := range templatesToCopy {
+		fmt.Printf("Now copying from %s...\n", templateDir)
+		err := defaultTemplateCopy(templateDir, destRoot, bootData)
+		if err != nil {
+			return fmt.Errorf("template %s had error %w", templateDir, err)
+		}
+	}
 	return nil
 }
 
@@ -102,6 +154,9 @@ func initE(cmd *cobra.Command, args []string) error {
 	if nameErr != nil {
 		return nameErr
 	}
+	if strings.Contains(name, " ") {
+		return errors.New("name cannot contain spaces")
+	}
 	template, templateErr := cmd.PersistentFlags().GetString("template")
 	if templateErr != nil {
 		return templateErr
@@ -112,17 +167,32 @@ func initE(cmd *cobra.Command, args []string) error {
 	}
 	execDir := filepath.Dir(execPath)
 	templateDir := filepath.Join(execDir, "templates", template)
-	if info, err := os.Stat(templateDir); err != nil || !info.IsDir() {
+	exists, err := dirExists(templateDir)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return errors.New("template provided not found in cmexl/templates")
+	}
+
+	templatesToCopy := []string{templateDir}
+
+	if !noVcpkg {
+		vcpkgDir := filepath.Join(execDir, "templates", "vcpkg_common")
+		exists, err = dirExists(vcpkgDir)
+
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return errors.New("vcpkg_common provided not found in cmexl/templates")
+		}
+		templatesToCopy = append(templatesToCopy, vcpkgDir)
 	}
 
 	sname, snameErr := cmd.PersistentFlags().GetString("short-name")
 	if snameErr != nil {
 		return snameErr
-	}
-	version, versionErr := cmd.PersistentFlags().GetString("version")
-	if versionErr != nil {
-		return versionErr
 	}
 
 	if len(name) <= 0 {
@@ -131,26 +201,21 @@ func initE(cmd *cobra.Command, args []string) error {
 	if len(sname) <= 0 {
 		sname = name
 	}
-
-	// TODO: ensure appropriate version format
-	if len(version) <= 0 {
-		version = "0.1.0.0"
+	if strings.Contains(sname, " ") {
+		return errors.New("short-name cannot contain spaces")
 	}
 
-	bootData := initData{
-		UseVcpkg:    !noVcpkg,
-		TemplateDir: templateDir,
-		Name:        name,
-		SName:       sname,
-		UName:       strings.ToUpper(sname),
-		LName:       strings.ToLower(sname),
-		Version:     version,
+	bootData := templateData{
+		UseVcpkg: !noVcpkg,
+		Name:     name,
+		SName:    sname,
+		UName:    strings.ToUpper(sname),
+		LName:    strings.ToLower(sname),
+		Version:  "0.1.0.0",
 	}
 
-	err = bootstrapTemplate(&bootData)
-	if err != nil {
-		return err
-	}
+	err = copyTemplates(templatesToCopy, &bootData)
+
 	return err
 }
 
@@ -171,7 +236,6 @@ func init() {
 
 	initCmd.PersistentFlags().Bool("no-vcpkg", false, "Omit vcpkg details. Default false")
 	initCmd.PersistentFlags().String("short-name", "", "Short name of project used in generated files. Default <name>")
-	initCmd.PersistentFlags().String("version", "0.1.0.0", "Initial version of project. Follows MAJOR.MINOR.PATCH.TWEAK. Default 0.1.0.0")
 
 	// TODO: omit version handling flag maybe?
 	// TODO: specify, add, delete configs.
