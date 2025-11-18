@@ -1,4 +1,3 @@
-{{/* Go Template */}}
 {
   "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
   "version": 10,
@@ -16,15 +15,25 @@
   ],
   "configurePresets": [
     {
-      "name": "vcpkg-base",
+      "name": "base",
       "hidden": true,
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "{{.UName}}_PRESET_NAME": "${presetName}"
+      }
+    },
+    {
+      "name": "vcpkg-base",
+      "$comment": ["TODO: set VCPKG_MANIFEST_INSTALL to FALSE once the package scheduler gets built"],
+      "hidden": true,
+      "inherits": "base",
       "environment": {
         "VCPKG_ROOT": "$penv{VCPKG_ROOT}"
       },
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "{{.UName}}_USE_VCPKG": "ON",
-        "{{.UName}}_PRESET_NAME": "${presetName}",
         "VCPKG_INSTALLED_DIR": "vcpkg_local/${presetName}/vcpkg_installed",
         "VCPKG_MANIFEST_FEATURES": "main"
       }
@@ -95,7 +104,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
       }
     },
     {
@@ -106,7 +115,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
       }
     },
     {
@@ -117,7 +126,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "VCPKG_TARGET_TRIPLET": "x86-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x86-linux-static-md.toolchain.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x86-linux-static-md.toolchain.cmake"
       }
     },
     {
@@ -128,7 +137,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "VCPKG_TARGET_TRIPLET": "x86-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x86-linux-static-md.toolchain.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x86-linux-static-md.toolchain.cmake"
       }
     },
     {
@@ -139,7 +148,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "VCPKG_TARGET_TRIPLET": "x64-linux-llvm-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-llvm-static-md.toolchain.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-llvm-static-md.toolchain.cmake"
       }
     },
     {
@@ -150,7 +159,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "VCPKG_TARGET_TRIPLET": "x64-mingw64-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-mingw64-static-md.toolchain.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-mingw64-static-md.toolchain.cmake"
       }
     },
     {
@@ -161,7 +170,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "VCPKG_TARGET_TRIPLET": "x86-mingw64-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x86-mingw64-static-md.toolchain.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x86-mingw64-static-md.toolchain.cmake"
       }
     }
   ]

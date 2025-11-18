@@ -1,4 +1,5 @@
-{{/* Go Template */}}
+include(GenerateExportHeader)
+
 if(NOT CMAKE_CXX_COMPILER)
     message(FATAL_ERROR "[CMEXL][ERROR] Cannot determine C++ compiler to use")
 endif()
@@ -158,7 +159,16 @@ target_link_options({{.SName}}_BuildSettings
     $<$<CONFIG:Debug>:$<IF:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,${${PROJ_PREFIX}_MSVC_OPTIONS_DEBUG_LINKING},${${PROJ_PREFIX}_GNU_OPTIONS_DEBUG_LINKING}>>
 )
 
-target_include_directories({{.SName}}_BuildSettings
-    INTERFACE
-    ${PROJECT_SOURCE_DIR}/include
-)
+macro(add_dll_support TARGET PREFIX)
+    message(STATUS "[CMEXL] adding dll support for ${TARGET}")
+
+    set_target_properties(${TARGET} 
+        PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN YES
+    )
+
+    generate_export_header(${TARGET}) 
+
+    target_include_directories(${TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+endmacro()

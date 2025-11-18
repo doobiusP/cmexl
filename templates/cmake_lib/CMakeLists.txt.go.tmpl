@@ -1,7 +1,7 @@
-﻿{{/* Go Template */}}
-cmake_minimum_required(VERSION 3.16)
+﻿cmake_minimum_required(VERSION 3.16)
 message(VERBOSE "[CMEXL] Now processing ${CMAKE_CURRENT_LIST_FILE}")
 
+set(PROJ_PREFIX {{.UName}})
 # Enable Hot Reload for MSVC compilers if supported
 if(MSVC AND POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
@@ -11,7 +11,6 @@ if(MSVC AND POLICY CMP0141)
 endif()
 
 include(cmake/{{.LName}}_options.cmake)
-
 {{if .UseVcpkg}}
 if({{.UName}}_USE_VCPKG)
   include(cmake/{{.LName}}_features.cmake)
@@ -24,12 +23,13 @@ endif()
 
 # =============== Project Init =============== #
 include(cmake/{{.LName}}_version.cmake)
-
+{{if .UseVcpkg}}
 message(STATUS "[CMEXL] starting vcpkg")
-set(PROJ_PREFIX {{.UName}})
-project({{.Name}} VERSION ${PROJ_PREFIX}_VER} LANGUAGES C CXX)
+{{end}}
+project({{.Name}} VERSION ${${PROJ_PREFIX}_VER} LANGUAGES C CXX)
+{{if .UseVcpkg}}
 message(STATUS "[CMEXL] vcpkg finished")
-
+{{end}}
 # =============== Config Check =============== #
 # TODO: Allow users to create their configs
 if((NOT GENERATOR_IS_MULTI_CONFIG) AND (NOT CMAKE_BUILD_TYPE))

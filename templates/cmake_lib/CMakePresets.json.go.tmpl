@@ -1,4 +1,3 @@
-{{/* Go Template */}}
 {
   "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
   "version": 10,
@@ -19,106 +18,112 @@
 {{end}}
   ],
   "configurePresets": [
+{{if not .UseVcpkg}}
     {
       "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
         "{{.UName}}_PRESET_NAME": "${presetName}"
       }
     },
+{{end}}
+    {
+      "name": "{{.LName}}-base",
+      "hidden": true,
+      "inherits": {{if .UseVcpkg}} "vcpkg-base" {{else}} "base" {{end}}
+    },
     {
       "name": "vs-msvc",
-{{if .UseVcpkg}}
-"inherits": "vcpkg-base",
-{{else}}
-"inherits": "base",
-{{end}}
+      "inherits": "{{.LName}}-base",
       "generator": "Visual Studio 17 2022",
       "displayName": "Visual Studio w/ MSVC (x64)",
       "cacheVariables": {
         "CMAKE_GENERATOR_PLATFORM": "x64",
-        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
         "{{.UName}}_BUILD_TESTS": "ON"
+{{if .UseVcpkg}}
+        ,"VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+{{end}}
       }
     },
     {
       "name": "x86-vs-msvc",
-{{if .UseVcpkg}}
-"inherits": "vcpkg-base",
-{{else}}
-"inherits": "base",
-{{end}}
+      "inherits": "{{.LName}}-base",
       "generator": "Visual Studio 17 2022",
       "displayName": "Visual Studio w/ MSVC (x86)",
       "cacheVariables": {
         "CMAKE_GENERATOR_PLATFORM": "Win32",
-        "VCPKG_TARGET_TRIPLET": "x86-windows-static-md",
         "{{.UName}}_BUILD_TESTS": "ON"
+{{if .UseVcpkg}}
+        ,"VCPKG_TARGET_TRIPLET": "x86-windows-static-md"
+{{end}}
       }
     },
     {
       "name": "x64-linux-dbg-gcc",
-{{if .UseVcpkg}}
-"inherits": "vcpkg-base",
-{{else}}
-"inherits": "base",
-{{end}}
+      "inherits": "{{.LName}}-base",
       "displayName": "Ninja w/ GCC (x64)(Debug)",
       "generator": "Ninja",
       "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake",
+        "CMAKE_BUILD_TYPE": "Debug",
         "{{.UName}}_BUILD_TESTS": "ON",
         "{{.UName}}_USE_BACKTRACE": "ON",
-        "CMAKE_BUILD_TYPE": "Debug"
+{{if .UseVcpkg}}
+        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{else}}
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{end}}
       }
     },
     {
       "name": "x64-linux-rel-gcc",
-{{if .UseVcpkg}}
-"inherits": "vcpkg-base",
-{{else}}
-"inherits": "base",
-{{end}}
+      "inherits": "{{.LName}}-base",
       "displayName": "Ninja w/ GCC (x64)(Release)",
       "generator": "Ninja",
       "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-static-md.toolchain.cmake",
+        "CMAKE_BUILD_TYPE": "Release",
         "{{.UName}}_USE_ADDR2LINE": "ON",
-        "CMAKE_BUILD_TYPE": "Release"
+{{if .UseVcpkg}}
+        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{else}}
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{end}}
       }
     },
     {
       "name": "x64-mingw64-dbg",
-{{if .UseVcpkg}}
-"inherits": "vcpkg-base",
-{{else}}
-"inherits": "base",
-{{end}}
+      "inherits": "{{.LName}}-base",
       "displayName": "Ninja w/ x86_64-w64-mingw32-g++posix (x64)(Debug)",
       "generator": "Ninja",
       "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-mingw64-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-mingw64-static-md.toolchain.cmake",
+        "CMAKE_BUILD_TYPE": "Debug",
         "{{.UName}}_BUILD_TESTS": "OFF",
         "{{.UName}}_USE_BACKTRACE": "ON",
-        "CMAKE_BUILD_TYPE": "Debug"
+{{if .UseVcpkg}}
+        "VCPKG_TARGET_TRIPLET": "x64-mingw64-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-mingw64-static-md.toolchain.cmake"
+{{else}}
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-mingw64-static-md.toolchain.cmake"
+{{end}}
       }
     },
     {
       "name": "x64-linux-clang-dbg",
-{{if .UseVcpkg}}
-"inherits": "vcpkg-base",
-{{else}}
-"inherits": "base",
-{{end}}
+      "inherits": "{{.LName}}-base",
       "displayName": "Ninja w/ Clang (x64)(Debug)(Check)",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "{{.UName}}_USE_BACKTRACE": "ON",
+{{if .UseVcpkg}}
         "VCPKG_TARGET_TRIPLET": "x64-linux-llvm-static-md",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/triplets/x64-linux-llvm-static-md.toolchain.cmake",
-        "{{.UName}}_USE_BACKTRACE": "ON"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-llvm-static-md.toolchain.cmake"
+{{else}}
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-llvm-static-md.toolchain.cmake"
+{{end}}
       }
     }
   ],
@@ -128,9 +133,6 @@
       "displayName": "Build w/ MSVC (x64)(Debug)",
       "configurePreset": "vs-msvc",
       "jobs": 4,
-      "targets": [
-        "DoobiusDriver"
-      ],
       "configuration": "Debug",
       "verbose": true
     },
@@ -139,9 +141,6 @@
       "displayName": "Build w/ MSVC (x64)(Release)",
       "configurePreset": "vs-msvc",
       "jobs": 4,
-      "targets": [
-        "DoobiusDriver"
-      ],
       "configuration": "Release",
       "verbose": true
     },
@@ -150,9 +149,6 @@
       "displayName": "Build w/ Ninja and GCC (x64)(Debug)",
       "configurePreset": "x64-linux-dbg-gcc",
       "jobs": 4,
-      "targets": [
-        "DoobiusDriver"
-      ],
       "verbose": true
     },
     {
@@ -160,9 +156,6 @@
       "displayName": "Build w/ Ninja and GCC (x64)(Release)",
       "configurePreset": "x64-linux-rel-gcc",
       "jobs": 4,
-      "targets": [
-        "DoobiusDriver"
-      ],
       "verbose": true
     },
     {
@@ -170,9 +163,6 @@
       "displayName": "Build w/ Ninja and x86_64-w64-mingw32-g++posix (x64)(Debug)",
       "configurePreset": "x64-mingw64-dbg",
       "jobs": 4,
-      "targets": [
-        "DoobiusDriver"
-      ],
       "verbose": true
     },
     {
@@ -180,9 +170,6 @@
       "displayName": "Build w/ Ninja and clang (x64)(Debug)",
       "configurePreset": "x64-linux-clang-dbg",
       "jobs": 4,
-      "targets": [
-        "DoobiusDriver"
-      ],
       "verbose": true
     }
   ],
