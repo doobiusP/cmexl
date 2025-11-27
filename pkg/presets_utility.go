@@ -6,8 +6,6 @@ import (
 )
 
 type Preset_t int
-type PresetMap_t map[PresetInfoKey]PresetInfo
-type PresetStr_t string
 
 const (
 	None Preset_t = iota
@@ -18,6 +16,9 @@ const (
 	Workflow
 	All
 )
+
+type PresetStr_t string
+
 const (
 	ConfigureStr PresetStr_t = "configure"
 	BuildStr     PresetStr_t = "build"
@@ -26,6 +27,8 @@ const (
 	WorkflowStr  PresetStr_t = "workflow"
 	AllStr       PresetStr_t = "all"
 )
+
+type PresetMap_t map[PresetInfoKey]PresetInfo
 
 func PresetIsAllowed(pr string) bool {
 	switch pr {
@@ -87,16 +90,9 @@ type PresetInfoKey struct {
 type PresetInfo struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
+	Hidden      bool   `json:"hidden"`
 	File        string
 	Type        Preset_t
-}
-
-type PresetState struct {
-	VcpkgRunning               bool
-	VcpkgReadingInstalled      bool
-	VcpkgReadingNeeded         bool
-	VcpkgAlreadyInstalledCount int16
-	VcpkgNeedInstalledCount    int16
 }
 
 func (pr Preset_t) String() string {
@@ -142,5 +138,5 @@ func (prStr *PresetStr_t) Set(v string) error {
 }
 
 func (prStr *PresetStr_t) Type() string {
-	return "presetStr_t"
+	return "PresetStr_t"
 }

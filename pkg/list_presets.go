@@ -8,17 +8,6 @@ import (
 	"os"
 )
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			fmt.Printf("Unknown error while trying to read %s: %v", path, err)
-		}
-		return false
-	}
-	return true
-}
-
 func extractPresets(prType Preset_t, path string, prMap map[PresetInfoKey]PresetInfo, prJson map[string]json.RawMessage) error {
 	presetField := fmt.Sprintf("%sPresets", prType.String())
 	var currPresetList []PresetInfo
@@ -28,6 +17,9 @@ func extractPresets(prType Preset_t, path string, prMap map[PresetInfoKey]Preset
 		}
 	}
 	for _, preset := range currPresetList {
+		if preset.Hidden {
+			continue
+		}
 		if len(preset.DisplayName) == 0 {
 			preset.DisplayName = "-"
 		}
