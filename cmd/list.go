@@ -19,18 +19,18 @@ func printPresets(cmd *cobra.Command, prType cmutils.Preset_t) error {
 		return fmt.Errorf("%v", namesOnlyPError)
 	}
 
-	var presetDetails []map[string]interface{}
+	var presetDetails []map[string]any
 
 	if namesOnly {
 		for prKey := range prMap {
-			presetDetails = append(presetDetails, map[string]interface{}{
+			presetDetails = append(presetDetails, map[string]any{
 				"name": prKey.Name,
 				"type": prKey.Type.String(),
 			})
 		}
 	} else {
 		for _, prVal := range prMap {
-			presetDetails = append(presetDetails, map[string]interface{}{
+			presetDetails = append(presetDetails, map[string]any{
 				"name":    prVal.Name,
 				"display": prVal.DisplayName,
 				"type":    prVal.Type.String(),
@@ -66,7 +66,7 @@ func getCmakePresetsE(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		for _, arg := range args {
-			prType, prErr := cmutils.PresetStrToType(arg)
+			prType, prErr := cmutils.MapPresetStrToType(arg)
 			if prErr != nil {
 				return prErr
 			}

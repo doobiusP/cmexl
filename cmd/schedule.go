@@ -8,10 +8,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var prTypeF = cmutils.ConfigureStr
+var prTypeFlag string
 
 func execPresetsE(cmd *cobra.Command, args []string) error {
-	prType, err := cmutils.MapPresetToType(prTypeF)
+	prType, err := cmutils.MapPresetStrToType(prTypeFlag)
 	if err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func execPresetsE(cmd *cobra.Command, args []string) error {
 }
 
 var scheduleCmd = &cobra.Command{
-	Use:   "schedule <preset-name> | subcommand",
+	Use:   "schedule -t <preset-type> <preset-names>",
 	Short: "Schedule preset(s) for execution",
 	RunE:  execPresetsE,
 	Args:  cobra.MinimumNArgs(1),
@@ -46,5 +46,5 @@ var scheduleCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(scheduleCmd)
-	scheduleCmd.Flags().VarP(&prTypeF, "ptype", "t", "Type of preset being passed in. Should be one of the cmake preset types.")
+	scheduleCmd.Flags().StringP(prTypeFlag, "type", "t", "Type of preset being passed in. Should be one of the cmake preset types.")
 }

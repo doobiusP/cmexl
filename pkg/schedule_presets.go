@@ -21,6 +21,11 @@ var (
 	tickerFreqHz          = float32(12.0)
 	eventChannelSizeScale = 20
 
+	cursorHide      = "\033[?25l"
+	cursorShow      = "\033[?25h"
+	cursorHome      = "\033[H"
+	clearFromCursor = "\033[0J"
+
 	cmexlRegex = regexp.MustCompile(`\[CMEXL\]\s*(?P<log>.*)$`)
 
 	vcpkgPkgDetailsRegex       = regexp.MustCompile(`(?P<package>[\w\-]+(?:\[[^\]]*\])?):(?P<triplet>[\w\-]+)(?:@(?P<version>[\w\.\-\+]+)(?:#(?P<patch>\d+))?)?`)
@@ -74,8 +79,7 @@ func startCmakeTicker(parentCtx context.Context, eventsCh chan<- CmexlEvent, prK
 				return
 			case t := <-ticker.C:
 				elapsedTime := t.Sub(start).Seconds()
-				tickerEventData := CmexlEventData{Log: "", ElapsedTime: elapsedTime}
-				tickerEvent := CmexlEvent{Key: prKey, Type: TimerUpdate, Data: tickerEventData, Result: nil}
+				tickerEvent := NewTimerUpdateEvent(prKey, elapsedTime)
 				TrySend(eventsCh, tickerEvent)
 			}
 		}
@@ -88,8 +92,7 @@ func startCmakeTicker(parentCtx context.Context, eventsCh chan<- CmexlEvent, prK
 
 func handleLine(line string, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, prState map[PresetInfoKey]PresetEventState) {
 	sendLogUpdate := func(logLine string) {
-		cmakeLogEventData := CmexlEventData{Log: logLine, ElapsedTime: -1}
-		cmakeLogEvent := CmexlEvent{Key: prKey, Type: LogLineUpdate, Data: cmakeLogEventData, Result: nil}
+		cmakeLogEvent := NewLogLineEvent(prKey, logLine)
 		TrySend(eventsCh, cmakeLogEvent)
 	}
 
@@ -182,10 +185,6 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 	if err != nil {
 		return prKey, fmt.Errorf("stdoutpipe: %w", err)
 	}
-	stderr, err := cmakeCmd.StderrPipe()
-	if err != nil {
-		return prKey, fmt.Errorf("stderrpipe: %w", err)
-	}
 
 	if err := cmakeCmd.Start(); err != nil {
 		return prKey, fmt.Errorf("failed to start cmake: %w", err)
@@ -207,59 +206,20 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 		defer func() {
 			buildLogger.Flush()
 			stdout.Close()
-			stderr.Close()
 			file.Close()
 		}()
 		err := cmakeCmd.Wait()
 		select {
 		case <-parentCtx.Done():
-			if cmakeCmd.Process != nil {
-				_ = cmakeCmd.Process.Kill()
-				reportCMakeErr(parentCtx.Err(), eventsCh, prKey)
-			}
+			_ = cmakeCmd.Process.Kill()
+			TrySend(eventsCh, NewExecExitEvent(prKey, parentCtx.Err(), err))
 		default:
 			if err != nil {
-				reportCMakeErr(err, eventsCh, prKey)
+				TrySend(eventsCh, NewExecExitEvent(prKey, parentCtx.Err(), err))
 			} else {
-				cmakeFinEventData := CmexlEventData{Log: "finished", ElapsedTime: -1}
-				cmakeFinEvent := CmexlEvent{Key: prKey, Type: ExecFinished, Data: cmakeFinEventData, Result: nil}
-				TrySend(eventsCh, cmakeFinEvent)
+				TrySend(eventsCh, NewExecExitEvent(prKey, parentCtx.Err(), err))
 			}
 		}
-	}()
-
-	go func() {
-		sc := bufio.NewScanner(stderr)
-		buf := make([]byte, 0, 64*1024)
-		sc.Buffer(buf, 1<<20) // ~1 MB
-
-		for sc.Scan() {
-			line := sc.Text()
-			fileMutexes[prKey].Lock()
-			if buildLogger.Available() < len(line) {
-				err := buildLogger.Flush()
-				if err != nil {
-					reportCMakeErr(err, eventsCh, prKey)
-				}
-			}
-			bytesWritten, err := buildLogger.WriteString(line)
-			if bytesWritten < len(line) {
-				reportCMakeErr(err, eventsCh, prKey)
-			}
-
-			err = buildLogger.WriteByte('\n')
-			if err != nil {
-				reportCMakeErr(err, eventsCh, prKey)
-			}
-			fileMutexes[prKey].Unlock()
-			select {
-			case <-parentCtx.Done():
-				return
-			default:
-				handleLine(line, eventsCh, prKey, prState)
-			}
-		}
-
 	}()
 
 	go func() {
@@ -269,23 +229,21 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 
 		for sc.Scan() {
 			line := sc.Text()
-			fileMutexes[prKey].Lock()
 			if buildLogger.Available() < len(line) {
 				err := buildLogger.Flush()
 				if err != nil {
-					reportCMakeErr(err, eventsCh, prKey)
+					TrySend(eventsCh, NewExecErrEvent(prKey, err))
 				}
 			}
 			bytesWritten, err := buildLogger.WriteString(line)
 			if bytesWritten < len(line) {
-				reportCMakeErr(err, eventsCh, prKey)
+				TrySend(eventsCh, NewExecErrEvent(prKey, err))
 			}
 
 			err = buildLogger.WriteByte('\n')
 			if err != nil {
-				reportCMakeErr(err, eventsCh, prKey)
+				TrySend(eventsCh, NewExecErrEvent(prKey, err))
 			}
-			fileMutexes[prKey].Unlock()
 
 			select {
 			case <-parentCtx.Done():
@@ -295,21 +253,19 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 			}
 		}
 		if err := sc.Err(); err != nil {
-			reportCMakeErr(err, eventsCh, prKey)
+			TrySend(eventsCh, NewExecErrEvent(prKey, err))
 		}
 	}()
 
 	return prKey, nil
 }
 
-var logDoubleBuffer [2]map[PresetInfoKey]presetState
-var fileMutexes map[PresetInfoKey]*sync.Mutex
+var logDoubleBuffer [2]map[PresetInfoKey]DisplayState
 var activeIndex atomic.Uint32 // active means the read-allowed buffer
 
 func init() {
-	logDoubleBuffer[0] = make(map[PresetInfoKey]presetState)
-	logDoubleBuffer[1] = make(map[PresetInfoKey]presetState)
-	fileMutexes = make(map[PresetInfoKey]*sync.Mutex)
+	logDoubleBuffer[0] = make(map[PresetInfoKey]DisplayState)
+	logDoubleBuffer[1] = make(map[PresetInfoKey]DisplayState)
 }
 
 func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error) {
@@ -321,18 +277,30 @@ func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error) {
 	}
 
 	switch ev.Type {
-	case ExecKilled:
-		s := logDoubleBuffer[cur][ev.Key]
-		s.Log = ev.Data.Log
-		logDoubleBuffer[next][ev.Key] = s
-		errReport[ev.Key] = append(errReport[ev.Key], ev.Result)
-	case ExecFinished, LogLineUpdate:
-		s := logDoubleBuffer[cur][ev.Key]
-		s.Log = ev.Data.Log
-		logDoubleBuffer[next][ev.Key] = s
 	case TimerUpdate:
 		s := logDoubleBuffer[cur][ev.Key]
-		s.ElapsedTime = float32(ev.Data.ElapsedTime)
+		s.ElapsedTime = ev.Payload.(TimerUpdatePayload).ElapsedTime
+		logDoubleBuffer[next][ev.Key] = s
+	case LogLineUpdate:
+		s := logDoubleBuffer[cur][ev.Key]
+		s.Log = ev.Payload.(LogLinePayload).Log
+		logDoubleBuffer[next][ev.Key] = s
+	case ExecErr:
+		err := ev.Payload.(ExecErrPayload).Err
+		s := logDoubleBuffer[cur][ev.Key]
+		s.Log = fmt.Sprintf("error during execution: %w", err)
+		logDoubleBuffer[next][ev.Key] = s
+		errReport[ev.Key] = append(errReport[ev.Key], err)
+	case ExecExit:
+		exitStatus := ev.Payload.(ExecExitPayload)
+		s := logDoubleBuffer[cur][ev.Key]
+		if exitStatus.Err != nil || exitStatus.ExitCode != nil {
+			err := fmt.Errorf("error after execution: %w, %w", exitStatus.Err, exitStatus.ExitCode)
+			s.Log = err.Error()
+			errReport[ev.Key] = append(errReport[ev.Key], err)
+		} else {
+			s.Log = "no errors occurred after execution"
+		}
 		logDoubleBuffer[next][ev.Key] = s
 	default:
 	}
@@ -340,15 +308,15 @@ func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error) {
 	activeIndex.Store(next)
 }
 
-func getActiveBuffer() map[PresetInfoKey]presetState {
+func getActiveBuffer() map[PresetInfoKey]DisplayState {
 	idx := activeIndex.Load()
 	return logDoubleBuffer[idx]
 }
 
-func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}) {
+func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}, keys []PresetInfoKey) {
+	fmt.Print(cursorHide)
+	defer fmt.Print(cursorShow)
 	defer uiWg.Done()
-	fmt.Print("\033[?25l")
-	defer fmt.Print("\033[?25h")
 
 	ticker := time.NewTicker(16 * time.Millisecond) // ~60 FPS
 	defer ticker.Stop()
@@ -356,30 +324,17 @@ func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}) {
 	render := func() {
 		snapshot := getActiveBuffer()
 
-		var b strings.Builder
-		b.WriteString("Preset Status\n")
-		b.WriteString("==============\n")
-
-		keys := make([]PresetInfoKey, 0, len(snapshot))
-		for k := range snapshot {
-			keys = append(keys, k)
-		}
-
-		sort.Slice(keys, func(i, j int) bool {
-			ni, nj := keys[i].Name, keys[j].Name
-			if ni == nj {
-				return keys[i].Type < keys[j].Type
-			}
-			return ni < nj
-		})
+		var frameData strings.Builder
+		frameData.WriteString("Preset Status\n")
+		frameData.WriteString("==============\n")
 
 		for i, k := range keys {
 			v := snapshot[k]
-			fmt.Fprintf(&b, "%d. %s (%v, %.2fs) : %s\n", i+1, k.Name, k.Type, v.ElapsedTime, v.Log)
+			fmt.Fprintf(&frameData, "%d. %s (%v, %.2fs) : %s\n", i+1, k.Name, k.Type, v.ElapsedTime, v.Log)
 		}
 
-		fmt.Print("\033[H\033[0J")
-		fmt.Print(b.String())
+		fmt.Print(cursorHome, clearFromCursor)
+		fmt.Print(frameData.String())
 	}
 
 	for {
@@ -398,11 +353,19 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	if numPrs < 1 {
 		return errors.New("no presets to execute")
 	}
+	sort.Slice(prKeys, func(i, j int) bool {
+		ni, nj := prKeys[i].Name, prKeys[j].Name
+		if ni == nj {
+			return prKeys[i].Type < prKeys[j].Type
+		}
+		return ni < nj
+	})
 
 	eventChSize := numPrs * (int(math.Ceil(float64(tickerFreqHz))) + 1) * eventChannelSizeScale
 	eventsCh := make(chan CmexlEvent, eventChSize)
-	var wg sync.WaitGroup
-	wg.Add(numPrs)
+
+	var cmakeWg sync.WaitGroup
+	cmakeWg.Add(numPrs)
 
 	var uiWg sync.WaitGroup
 	uiWg.Add(1)
@@ -417,8 +380,10 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	if err != nil {
 		return err
 	}
+
+	// Beyond this point, we should not abruptly halt this parent process since we want any working preset to at least finish
 	for _, key := range prKeys {
-		prKey, initErr := startCMakeCommand(ctx, eventsCh, key, &wg, presetExecStates)
+		prKey, initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, presetExecStates)
 		if initErr != nil {
 			errReport[key] = append(errReport[key], fmt.Errorf("{%s, %s}: %w", prKey.Name, prKey.Type.String(), initErr))
 		}
@@ -431,9 +396,10 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	}()
 
 	uiDone := make(chan struct{})
-	go drawUI(&uiWg, uiDone)
+	go drawUI(&uiWg, uiDone, prKeys)
 
-	wg.Wait()
+	// event draining
+	cmakeWg.Wait()
 	for len(eventsCh) > 0 {
 		ev := <-eventsCh
 		updateState(ev, errReport)
@@ -442,17 +408,7 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	close(uiDone)
 	uiWg.Wait()
 
-	keys := make([]PresetInfoKey, 0, len(errReport))
-	for k := range errReport {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].Name == keys[j].Name {
-			return keys[i].Type < keys[j].Type
-		}
-		return keys[i].Name < keys[j].Name
-	})
-
+	// TODO: Remove this for projects that dont need vcpkg. Will have to read from viper for this
 	fmt.Println("Packages")
 	fmt.Println("==============")
 	for key, val := range presetExecStates {
@@ -461,14 +417,12 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 
 	fmt.Println("Error Report")
 	fmt.Println("==============")
-	if len(keys) <= 0 {
-		fmt.Print("None")
+	if len(errReport) <= 0 {
+		fmt.Print("none")
 	} else {
-		for _, k := range keys {
-			if err, ok := errReport[k]; ok && err != nil {
-				for _, each_err := range err {
-					fmt.Printf("{%s, %v}: %s\n", k.Name, k.Type, each_err)
-				}
+		for prKey, errList := range errReport {
+			for _, err := range errList {
+				fmt.Printf("{%s, %v}: %s\n", prKey.Name, prKey.Type, err)
 			}
 		}
 	}

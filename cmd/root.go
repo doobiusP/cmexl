@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmexlVer = "0.3.0.2"
+var cmexlVer = "0.4.0.0"
 
 var rootCmd = &cobra.Command{
 	Use:     "cmexl [command]",

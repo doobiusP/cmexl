@@ -1,7 +1,6 @@
 package cmexl_utils
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -17,53 +16,32 @@ const (
 	All
 )
 
-type PresetStr_t string
-
-const (
-	ConfigureStr PresetStr_t = "configure"
-	BuildStr     PresetStr_t = "build"
-	TestStr      PresetStr_t = "test"
-	PackageStr   PresetStr_t = "package"
-	WorkflowStr  PresetStr_t = "workflow"
-	AllStr       PresetStr_t = "all"
+var (
+	ConfigureStr = "configure"
+	BuildStr     = "build"
+	TestStr      = "test"
+	PackageStr   = "package"
+	WorkflowStr  = "workflow"
+	AllStr       = "all"
 )
 
 type PresetMap_t map[PresetInfoKey]PresetInfo
 
 func PresetIsAllowed(pr string) bool {
 	switch pr {
-	case string(ConfigureStr),
-		string(BuildStr),
-		string(TestStr),
-		string(PackageStr),
-		string(WorkflowStr),
-		string(AllStr):
+	case ConfigureStr,
+		BuildStr,
+		TestStr,
+		PackageStr,
+		WorkflowStr,
+		AllStr:
 		return true
 	default:
 		return false
 	}
 }
 
-func MapPresetToType(pr PresetStr_t) (Preset_t, error) {
-	switch pr {
-	case ConfigureStr:
-		return Configure, nil
-	case BuildStr:
-		return Build, nil
-	case TestStr:
-		return Test, nil
-	case PackageStr:
-		return Package, nil
-	case WorkflowStr:
-		return Workflow, nil
-	case AllStr:
-		return All, nil
-	default:
-		return None, errors.New("found unexpected preset string")
-	}
-}
-
-func PresetStrToType(pr string) (Preset_t, error) {
+func MapPresetStrToType(pr string) (Preset_t, error) {
 	switch pr {
 	case "configure":
 		return Configure, nil
@@ -78,7 +56,7 @@ func PresetStrToType(pr string) (Preset_t, error) {
 	case "all":
 		return All, nil
 	default:
-		return None, errors.New("found unexpected preset string")
+		return None, fmt.Errorf("got unexpected preset string: %s", pr)
 	}
 }
 
@@ -121,22 +99,4 @@ func (prInfo PresetInfo) String() string {
 	msg += fmt.Sprintf("File: %s, ", prInfo.File)
 	msg += fmt.Sprintf("Type: %s", prInfo.Type.String())
 	return msg
-}
-
-func (prStr *PresetStr_t) String() string {
-	return string(*prStr)
-}
-
-func (prStr *PresetStr_t) Set(v string) error {
-	switch v {
-	case "configure", "build", "test", "package", "workflow", "all":
-		*prStr = PresetStr_t(v)
-		return nil
-	default:
-		return errors.New(`must be one of {"configure", "build", "test", "package", "workflow", "all"}`)
-	}
-}
-
-func (prStr *PresetStr_t) Type() string {
-	return "PresetStr_t"
 }
