@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"os/exec"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -25,16 +24,6 @@ var (
 	cursorShow      = "\033[?25h"
 	cursorHome      = "\033[H"
 	clearFromCursor = "\033[0J"
-
-	cmexlRegex = regexp.MustCompile(`\[CMEXL\]\s*(?P<log>.*)$`)
-
-	vcpkgPkgDetailsRegex       = regexp.MustCompile(`(?P<package>[\w\-]+(?:\[[^\]]*\])?):(?P<triplet>[\w\-]+)(?:@(?P<version>[\w\.\-\+]+)(?:#(?P<patch>\d+))?)?`)
-	vcpkgLockRegex             = regexp.MustCompile(`waiting to take filesystem lock`)
-	vcpkgAlreadyInstalledRegex = regexp.MustCompile(`The following packages are already installed`)
-	vcpkgNeedInstalledRegex    = regexp.MustCompile(`The following packages will be (?:built and installed|rebuilt|removed)`)
-	vcpkgCompilerHashRegex     = regexp.MustCompile(`Detecting compiler hash`)
-	vcpkgFailedRegex           = regexp.MustCompile(`Running vcpkg install - failed`)
-	vcpkgManifestLogRegex      = regexp.MustCompile(`(?P<manifest_log>\S*vcpkg-manifest-install\.log)`)
 )
 
 func getCmakeCommand(ctx context.Context, prKey PresetInfoKey) (*exec.Cmd, error) {
@@ -85,119 +74,37 @@ func startCmakeTicker(parentCtx context.Context, eventsCh chan<- CmexlEvent, prK
 		}
 	}()
 
+	// We provide the ability for the state of the cmake command to dictate when to stop timing
 	return func() {
 		cancel()
 	}
 }
 
-func handleLine(line string, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, prState map[PresetInfoKey]PresetEventState) {
-	sendLogUpdate := func(logLine string) {
-		cmakeLogEvent := NewLogLineEvent(prKey, logLine)
-		TrySend(eventsCh, cmakeLogEvent)
-	}
-
-	if match := cmexlRegex.FindStringSubmatch(line); match != nil {
-		logIdx := cmexlRegex.SubexpIndex("log")
-		out := match[logIdx]
-
-		switch out {
-		case "starting vcpkg":
-			vr := prState[prKey]
-			vr.VcpkgRunning = true
-			prState[prKey] = vr
-		case "vcpkg finished":
-			vr := prState[prKey]
-			vr.VcpkgRunning = false
-			prState[prKey] = vr
-		default:
-		}
-
-		sendLogUpdate(out)
-	}
-
-	if match := vcpkgLockRegex.FindString(line); len(match) != 0 && prState[prKey].VcpkgRunning {
-		sendLogUpdate("waiting for vcpkg lock")
-	}
-
-	if match := vcpkgCompilerHashRegex.FindString(line); len(match) != 0 && prState[prKey].VcpkgRunning {
-		sendLogUpdate("checking for change in build environment")
-	}
-
-	if match := vcpkgFailedRegex.FindString(line); len(match) != 0 && prState[prKey].VcpkgRunning {
-		sendLogUpdate("vcpkg failed")
-	}
-
-	if match := vcpkgAlreadyInstalledRegex.FindString(line); len(match) != 0 && prState[prKey].VcpkgRunning {
-		vr := prState[prKey]
-		vr.VcpkgReadingInstalled = true
-		vr.VcpkgReadingNeeded = false
-		prState[prKey] = vr
-	}
-
-	if match := vcpkgNeedInstalledRegex.FindString(line); len(match) != 0 && prState[prKey].VcpkgRunning {
-		vr := prState[prKey]
-		vr.VcpkgReadingInstalled = false
-		vr.VcpkgReadingNeeded = true
-		prState[prKey] = vr
-	}
-
-	if match := vcpkgPkgDetailsRegex.FindStringSubmatch(line); match != nil && prState[prKey].VcpkgRunning {
-		pkgIdx := vcpkgPkgDetailsRegex.SubexpIndex("package")
-		versionIdx := vcpkgPkgDetailsRegex.SubexpIndex("version")
-		patchIdx := vcpkgPkgDetailsRegex.SubexpIndex("patch")
-
-		patchStr := match[patchIdx]
-		if patchStr == "" {
-			patchStr = "/NA"
-		}
-
-		var action string
-		if strings.ContainsAny(line, "install") {
-			action = "installing"
-		} else if strings.Contains(line, "rebuilt") {
-			action = "rebuilding"
-		} else if strings.Contains(line, "remove") {
-			action = "removing"
-		}
-
-		out := fmt.Sprintf("Now %s %s @ %s with vcpkg patch %s", action, match[pkgIdx], match[versionIdx], patchStr)
-
-		if prState[prKey].VcpkgReadingInstalled {
-			vr := prState[prKey]
-			vr.VcpkgAlreadyInstalledCount += 1
-			prState[prKey] = vr
-		} else if prState[prKey].VcpkgReadingNeeded {
-			vr := prState[prKey]
-			vr.VcpkgNeedInstalledCount += 1
-			prState[prKey] = vr
-		}
-		sendLogUpdate(out)
-	}
-}
-
-func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, wg *sync.WaitGroup, prState map[PresetInfoKey]PresetEventState) (PresetInfoKey, error) {
+func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, wg *sync.WaitGroup, cmexlStateMap map[PresetInfoKey]*CmexlStateMachine) error {
 	cmakeCmd, err := getCmakeCommand(parentCtx, prKey)
 	if err != nil {
-		return prKey, err
+		return err
 	}
-
-	stdout, err := cmakeCmd.StdoutPipe()
-	if err != nil {
-		return prKey, fmt.Errorf("stdoutpipe: %w", err)
-	}
-
-	if err := cmakeCmd.Start(); err != nil {
-		return prKey, fmt.Errorf("failed to start cmake: %w", err)
-	}
-
 	filename := fmt.Sprintf(".cmexl/%s.log", prKey.Name)
 	file, err := os.Create(filename)
 	if err != nil {
-		return prKey, err
+		return err
 	}
-	buildLogger := bufio.NewWriterSize(file, 0.5*1024)
+	cmdStateMachinePtr := new(CmexlStateMachine)
+	cmdStateMachinePtr.PrKey = prKey
+	cmexlStateMap[prKey] = cmdStateMachinePtr
 
 	stopTicker := startCmakeTicker(parentCtx, eventsCh, prKey, tickerFreqHz)
+
+	stdout, err := cmakeCmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("stdoutpipe: %w", err)
+	}
+
+	if err := cmakeCmd.Start(); err != nil {
+		return fmt.Errorf("failed to start cmake: %w", err)
+	}
+	buildLogger := bufio.NewWriterSize(file, 0.5*1024)
 
 	// Handles shutdown mechanics of the CMake Cmd
 	go func() {
@@ -226,6 +133,7 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 		sc := bufio.NewScanner(stdout)
 		buf := make([]byte, 0, 64*1024)
 		sc.Buffer(buf, 1<<20) // ~1 MB
+		cmexlStateFn := CmexlDefaultStateFn
 
 		for sc.Scan() {
 			line := sc.Text()
@@ -249,7 +157,7 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 			case <-parentCtx.Done():
 				return
 			default:
-				handleLine(line, eventsCh, prKey, prState)
+				cmexlStateFn = cmexlStateFn(line, cmdStateMachinePtr, eventsCh)
 			}
 		}
 		if err := sc.Err(); err != nil {
@@ -257,7 +165,7 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 		}
 	}()
 
-	return prKey, nil
+	return nil
 }
 
 var logDoubleBuffer [2]map[PresetInfoKey]DisplayState
@@ -288,7 +196,7 @@ func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error) {
 	case ExecErr:
 		err := ev.Payload.(ExecErrPayload).Err
 		s := logDoubleBuffer[cur][ev.Key]
-		s.Log = fmt.Sprintf("error during execution: %w", err)
+		s.Log = fmt.Sprintf("error during execution: %s", err)
 		logDoubleBuffer[next][ev.Key] = s
 		errReport[ev.Key] = append(errReport[ev.Key], err)
 	case ExecExit:
@@ -353,6 +261,7 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	if numPrs < 1 {
 		return errors.New("no presets to execute")
 	}
+	// TODO: This is the point where we can execute an early vcpkg install as an optimisation
 	sort.Slice(prKeys, func(i, j int) bool {
 		ni, nj := prKeys[i].Name, prKeys[j].Name
 		if ni == nj {
@@ -374,18 +283,22 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	defer cancel()
 
 	errReport := make(map[PresetInfoKey][]error)
-	presetExecStates := make(map[PresetInfoKey]PresetEventState)
+	cmexlExecStates := make(map[PresetInfoKey]*CmexlStateMachine, numPrs)
 
 	err := CreateCmexlStore()
 	if err != nil {
 		return err
 	}
 
+	addErrToReport := func(err error, key PresetInfoKey) {
+		errReport[key] = append(errReport[key], fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+	}
+
 	// Beyond this point, we should not abruptly halt this parent process since we want any working preset to at least finish
 	for _, key := range prKeys {
-		prKey, initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, presetExecStates)
+		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlExecStates)
 		if initErr != nil {
-			errReport[key] = append(errReport[key], fmt.Errorf("{%s, %s}: %w", prKey.Name, prKey.Type.String(), initErr))
+			addErrToReport(initErr, key)
 		}
 	}
 
@@ -411,7 +324,7 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	// TODO: Remove this for projects that dont need vcpkg. Will have to read from viper for this
 	fmt.Println("Packages")
 	fmt.Println("==============")
-	for key, val := range presetExecStates {
+	for key, val := range cmexlExecStates {
 		fmt.Printf("{%s, %s}: Already installed: %d, Needed installation/removal: %d\n", key.Name, key.Type.String(), val.VcpkgAlreadyInstalledCount, val.VcpkgNeedInstalledCount)
 	}
 
