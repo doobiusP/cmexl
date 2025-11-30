@@ -11,9 +11,10 @@ import (
 var (
 	CmexlRegex = regexp.MustCompile(`\[CMEXL\]\s*(?P<log>.*)$`)
 
-	VcpkgPkgDetailsRegex       = regexp.MustCompile(`(?P<package>[\w\-]+(?:\[[^\]]*\])?):(?P<triplet>[\w\-]+)(?:@(?P<version>[\w\.\-\+]+)(?:#(?P<patch>\d+))?)?`)
-	VcpkgAlreadyInstalledRegex = regexp.MustCompile(`The following packages are already installed`)
-	VcpkgNeedInstalledRegex    = regexp.MustCompile(`The following packages will be (?:built and installed|rebuilt|removed|installed)`)
+	VcpkgPkgDetailsRegex         = regexp.MustCompile(`(?P<package>[\w\-]+(?:\[[^\]]*\])?):(?P<triplet>[\w\-]+)(?:@(?P<version>[\w\.\-\+]+)(?:#(?P<patch>\d+))?)?`)
+	VcpkgAlreadyInstalledRegex   = regexp.MustCompile(`The following packages are already installed`)
+	VcpkgInstalledDelimeterRegex = regexp.MustCompile(`Additional packages \(\*\) will be modified to complete this operation`)
+	VcpkgNeedInstalledRegex      = regexp.MustCompile(`The following packages will be (?:built and installed|rebuilt|removed|installed)`)
 
 	VcpkgLockRegex         = regexp.MustCompile(`waiting to take filesystem lock`)
 	VcpkgCompilerHashRegex = regexp.MustCompile(`Detecting compiler hash`)
@@ -96,7 +97,7 @@ func (e CmexlEvent) String() string {
 	default:
 		eventInfo = "UNABLE TO DECODE PAYLOAD"
 	}
-	return fmt.Sprintf("[%s:%s](%s) Event Info: %s", e.Key.Name, e.Key.Type.String(), e.Type.String(), eventInfo)
+	return fmt.Sprintf("[%s:%s](%s) %s", e.Key.Name, e.Key.Type.String(), e.Type.String(), eventInfo)
 }
 
 func NewTimerUpdateEvent(key PresetInfoKey, elapsed float64) CmexlEvent {
@@ -236,6 +237,7 @@ func CmexlVcpkgAIStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- 
 		send("vcpkg success")
 		return CmexlDefaultStateFn
 	}
+	// TODO: Put VcpkgInstalledDelimeterRegex here as a check and move into a new state where you stop counting
 
 	return CmexlVcpkgAIStateFn
 }
@@ -261,6 +263,11 @@ func CmexlVcpkgStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- Cm
 	if match := VcpkgSuccessRegex.FindString(line); len(match) != 0 {
 		send("vcpkg success")
 		return CmexlDefaultStateFn
+	}
+
+	if match := VcpkgNeedInstalledRegex.FindString(line); len(match) != 0 {
+		send("checking for packages that need to be installed")
+		return CmexlVcpkgNIStateFn
 	}
 
 	if match := VcpkgAlreadyInstalledRegex.FindString(line); len(match) != 0 {
@@ -289,16 +296,14 @@ func CmexlDefaultStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- 
 	return CmexlDefaultStateFn
 }
 
-// type PresetEventState struct {
-// 	VcpkgRunning               bool
-// 	VcpkgReadingInstalled      bool
-// 	VcpkgReadingNeeded         bool
-// 	VcpkgAlreadyInstalledCount int16
-// 	VcpkgNeedInstalledCount    int16
-// }
-
-func CreateCmexlStore() error {
+func CreateCmexlStore(flags ScheduleFlags) error {
 	err := os.MkdirAll(".cmexl", 0755)
+	if err != nil {
+		return err
+	}
+	if *flags.SaveEvents {
+		err = os.MkdirAll(".cmexl/events", 0755)
+	}
 	return err
 }
 

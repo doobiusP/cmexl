@@ -26,7 +26,12 @@ var (
 	clearFromCursor = "\033[0J"
 )
 
-func getCmakeCommand(ctx context.Context, prKey PresetInfoKey) (*exec.Cmd, error) {
+type ScheduleFlags struct {
+	SaveEvents *bool
+	Refresh    *bool
+}
+
+func getCmakeCommand(ctx context.Context, prKey PresetInfoKey, flags ScheduleFlags) (*exec.Cmd, error) {
 	var cmakeArgs []string
 	var cmakeCmd string
 
@@ -46,6 +51,9 @@ func getCmakeCommand(ctx context.Context, prKey PresetInfoKey) (*exec.Cmd, error
 	}
 	cmakeArgs = append(cmakeArgs, "--preset")
 	cmakeArgs = append(cmakeArgs, prKey.Name)
+	if *flags.Refresh {
+		cmakeArgs = append(cmakeArgs, "--fresh")
+	}
 
 	return exec.CommandContext(ctx, cmakeCmd, cmakeArgs...), nil
 }
@@ -80,8 +88,8 @@ func startCmakeTicker(parentCtx context.Context, eventsCh chan<- CmexlEvent, prK
 	}
 }
 
-func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, wg *sync.WaitGroup, cmexlStateMap map[PresetInfoKey]*CmexlStateMachine) error {
-	cmakeCmd, err := getCmakeCommand(parentCtx, prKey)
+func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, wg *sync.WaitGroup, cmexlStateMap map[PresetInfoKey]*CmexlStateMachine, flags ScheduleFlags) error {
+	cmakeCmd, err := getCmakeCommand(parentCtx, prKey, flags)
 	if err != nil {
 		return err
 	}
@@ -176,7 +184,7 @@ func init() {
 	logDoubleBuffer[1] = make(map[PresetInfoKey]DisplayState)
 }
 
-func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error) {
+func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error, eventsLogMap map[PresetInfoKey]*os.File, flags ScheduleFlags) {
 	cur := activeIndex.Load()
 	next := (cur + 1) % 2
 
@@ -211,6 +219,18 @@ func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error) {
 		}
 		logDoubleBuffer[next][ev.Key] = s
 	default:
+	}
+
+	if *flags.SaveEvents {
+		switch ev.Type {
+		case LogLineUpdate, ExecErr, ExecExit:
+			file := eventsLogMap[ev.Key]
+			evLog := fmt.Sprintf("%fs : %s\n", logDoubleBuffer[next][ev.Key].ElapsedTime, ev)
+			if _, err := file.WriteString(evLog); err != nil {
+				panicMsg := fmt.Sprintf("failed to write event log (%s) for {%s,%s}", evLog, ev.Key.Name, ev.Key.Type)
+				panic(panicMsg)
+			}
+		}
 	}
 
 	activeIndex.Store(next)
@@ -256,7 +276,7 @@ func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}, keys []PresetInfoKey) 
 	}
 }
 
-func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetMap_t) error {
+func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetMap_t, flags ScheduleFlags) error {
 	numPrs := len(prKeys)
 	if numPrs < 1 {
 		return errors.New("no presets to execute")
@@ -284,8 +304,9 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 
 	errReport := make(map[PresetInfoKey][]error)
 	cmexlExecStates := make(map[PresetInfoKey]*CmexlStateMachine, numPrs)
+	eventsLogMap := make(map[PresetInfoKey]*os.File, numPrs)
 
-	err := CreateCmexlStore()
+	err := CreateCmexlStore(flags)
 	if err != nil {
 		return err
 	}
@@ -296,15 +317,25 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 
 	// Beyond this point, we should not abruptly halt this parent process since we want any working preset to at least finish
 	for _, key := range prKeys {
-		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlExecStates)
+		if *flags.SaveEvents {
+			filename := fmt.Sprintf(".cmexl/events/%s.log", key.Name)
+			file, err := os.Create(filename)
+			if err != nil {
+				addErrToReport(err, key)
+			}
+			eventsLogMap[key] = file
+			defer file.Close()
+		}
+		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlExecStates, flags)
 		if initErr != nil {
 			addErrToReport(initErr, key)
 		}
+
 	}
 
 	go func() {
 		for ev := range eventsCh {
-			updateState(ev, errReport)
+			updateState(ev, errReport, eventsLogMap, flags)
 		}
 	}()
 
@@ -315,7 +346,7 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	cmakeWg.Wait()
 	for len(eventsCh) > 0 {
 		ev := <-eventsCh
-		updateState(ev, errReport)
+		updateState(ev, errReport, eventsLogMap, flags)
 	}
 	close(eventsCh)
 	close(uiDone)

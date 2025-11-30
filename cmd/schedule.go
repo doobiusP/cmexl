@@ -8,9 +8,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var prTypeFlag string
+var flags cmutils.ScheduleFlags
 
 func execPresetsE(cmd *cobra.Command, args []string) error {
+	prTypeFlag, typeError := cmd.Flags().GetString("type")
+	if typeError != nil {
+		return typeError
+	}
 	prType, err := cmutils.MapPresetStrToType(prTypeFlag)
 	if err != nil {
 		return err
@@ -33,7 +37,7 @@ func execPresetsE(cmd *cobra.Command, args []string) error {
 		prList = append(prList, prKey)
 	}
 
-	err = cmutils.ScheduleCmakePresets(prType, prList, prMap)
+	err = cmutils.ScheduleCmakePresets(prType, prList, prMap, flags)
 	return err
 }
 
@@ -46,5 +50,7 @@ var scheduleCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(scheduleCmd)
-	scheduleCmd.Flags().StringP(prTypeFlag, "type", "t", "Type of preset being passed in. Should be one of the cmake preset types.")
+	scheduleCmd.Flags().StringP("type", "t", "", "Type of preset being passed in. Should be one of the cmake preset types.")
+	flags.SaveEvents = scheduleCmd.Flags().Bool("save-events", false, "Save events picked up by cmexl under .cmexl/events/{presetName}.log")
+	flags.Refresh = scheduleCmd.Flags().Bool("refresh", false, "Rebuild binary directory from scratch")
 }

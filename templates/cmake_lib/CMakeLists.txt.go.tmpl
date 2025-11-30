@@ -23,13 +23,7 @@ endif()
 
 # =============== Project Init =============== #
 include(cmake/{{.LName}}_version.cmake)
-{{if .UseVcpkg}}
-message(STATUS "[CMEXL] starting vcpkg")
-{{end}}
 project({{.Name}} VERSION ${${PROJ_PREFIX}_VER} LANGUAGES C CXX)
-{{if .UseVcpkg}}
-message(STATUS "[CMEXL] vcpkg finished")
-{{end}}
 # =============== Config Check =============== #
 # TODO: Allow users to create their configs
 if((NOT GENERATOR_IS_MULTI_CONFIG) AND (NOT CMAKE_BUILD_TYPE))
