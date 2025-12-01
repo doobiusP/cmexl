@@ -14,7 +14,9 @@ var (
 	VcpkgPkgDetailsRegex         = regexp.MustCompile(`(?P<package>[\w\-]+(?:\[[^\]]*\])?):(?P<triplet>[\w\-]+)(?:@(?P<version>[\w\.\-\+]+)(?:#(?P<patch>\d+))?)?`)
 	VcpkgAlreadyInstalledRegex   = regexp.MustCompile(`The following packages are already installed`)
 	VcpkgInstalledDelimeterRegex = regexp.MustCompile(`Additional packages \(\*\) will be modified to complete this operation`)
+	VcpkgWorkProgressRegex       = regexp.MustCompile(`(?P<action>Installing|Removing)\s+(?P<current>\d+)\/(?P<total>\d+)`)
 	VcpkgNeedInstalledRegex      = regexp.MustCompile(`The following packages will be (?:built and installed|rebuilt|removed|installed)`)
+	VcpkgNeedRemovedRegex        = regexp.MustCompile(`The following packages will be removed`)
 
 	VcpkgLockRegex         = regexp.MustCompile(`waiting to take filesystem lock`)
 	VcpkgCompilerHashRegex = regexp.MustCompile(`Detecting compiler hash`)
@@ -144,154 +146,177 @@ func NewExecErrEvent(key PresetInfoKey, err error) CmexlEvent {
 type CmexlStateMachine struct {
 	PrKey                      PresetInfoKey
 	VcpkgAlreadyInstalledCount int16
+	VcpkgNeedRemovedCount      int16
 	VcpkgNeedInstalledCount    int16
 }
 
 type CmexlStateFunc func(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc
 
+func send(log string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) {
+	cmakeLogEvent := NewLogLineEvent(smPtr.PrKey, log)
+	TrySend(eventsCh, cmakeLogEvent)
+}
+
+func sendPackageDetails(action string, match []string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) {
+	pkgIdx := VcpkgPkgDetailsRegex.SubexpIndex("package")
+	versionIdx := VcpkgPkgDetailsRegex.SubexpIndex("version")
+	patchIdx := VcpkgPkgDetailsRegex.SubexpIndex("patch")
+
+	trimmedVersion := strings.TrimSuffix(match[versionIdx], "...")
+
+	patchStr := match[patchIdx]
+
+	var out string
+	if patchStr == "" {
+		if trimmedVersion == "" {
+			out = fmt.Sprintf("%s %s", action, match[pkgIdx])
+		} else {
+			out = fmt.Sprintf("%s %s @ %s", action, match[pkgIdx], trimmedVersion)
+		}
+	} else {
+		out = fmt.Sprintf("%s %s @ %s with vcpkg patch %s", action, match[pkgIdx], trimmedVersion, patchStr)
+	}
+	send(out, smPtr, eventsCh)
+}
+
 // NI stands for need to install
 func CmexlVcpkgNIStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
-	send := func(log string) {
-		cmakeLogEvent := NewLogLineEvent(smPtr.PrKey, log)
-		TrySend(eventsCh, cmakeLogEvent)
-	}
-
 	if match := VcpkgPkgDetailsRegex.FindStringSubmatch(line); match != nil {
-		pkgIdx := VcpkgPkgDetailsRegex.SubexpIndex("package")
-		versionIdx := VcpkgPkgDetailsRegex.SubexpIndex("version")
-		patchIdx := VcpkgPkgDetailsRegex.SubexpIndex("patch")
-
-		patchStr := match[patchIdx]
-		if patchStr == "" {
-			patchStr = "/NA"
-		}
-
-		var action string
-		if strings.ContainsAny(line, "install") {
-			action = "installing"
-		} else if strings.Contains(line, "rebuilt") {
-			action = "rebuilding"
-		} else if strings.Contains(line, "remove") {
-			action = "removing"
-		}
-
-		out := fmt.Sprintf("Now %s %s @ %s with vcpkg patch %s", action, match[pkgIdx], match[versionIdx], patchStr)
+		sendPackageDetails("Found needed to install", match, smPtr, eventsCh)
 		smPtr.VcpkgNeedInstalledCount += 1
-		send(out)
 		return CmexlVcpkgNIStateFn
 	}
-	if match := VcpkgFailedRegex.FindString(line); len(match) != 0 {
-		send("vcpkg failed - check logs")
-		return CmexlDefaultStateFn
-	}
-	if match := VcpkgSuccessRegex.FindString(line); len(match) != 0 {
-		send("vcpkg success")
-		return CmexlDefaultStateFn
+
+	if match := VcpkgInstalledDelimeterRegex.FindString(line); len(match) != 0 {
+		send(fmt.Sprintf("now building %d required packages and removing %d unecessary packages", smPtr.VcpkgNeedInstalledCount, smPtr.VcpkgNeedRemovedCount), smPtr, eventsCh)
+		return CmexlVcpkgWorkingStateFn
 	}
 
 	return CmexlVcpkgNIStateFn
 }
 
-// AI stands for already installed
-func CmexlVcpkgAIStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
-	send := func(log string) {
-		cmakeLogEvent := NewLogLineEvent(smPtr.PrKey, log)
-		TrySend(eventsCh, cmakeLogEvent)
+func CmexlVcpkgWorkingStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
+	packageMatch := VcpkgPkgDetailsRegex.FindStringSubmatch(line)
+	progressMatch := VcpkgWorkProgressRegex.FindStringSubmatch(line)
+
+	if packageMatch != nil && progressMatch != nil {
+		actionStr := strings.ToLower(progressMatch[VcpkgWorkProgressRegex.SubexpIndex("action")])
+		currentStr := progressMatch[VcpkgWorkProgressRegex.SubexpIndex("current")]
+		totalStr := progressMatch[VcpkgWorkProgressRegex.SubexpIndex("total")]
+
+		finalAction := fmt.Sprintf("(%s/%s) Now %s", currentStr, totalStr, actionStr)
+		sendPackageDetails(finalAction, packageMatch, smPtr, eventsCh)
+		return CmexlVcpkgWorkingStateFn
 	}
 
+	if match := VcpkgFailedRegex.FindString(line); len(match) != 0 {
+		send("vcpkg failed - check logs", smPtr, eventsCh)
+		return CmexlDefaultStateFn
+	}
+	if match := VcpkgSuccessRegex.FindString(line); len(match) != 0 {
+		send("vcpkg success", smPtr, eventsCh)
+		return CmexlDefaultStateFn
+	}
+
+	return CmexlVcpkgWorkingStateFn
+}
+
+// AI stands for already installed
+func CmexlVcpkgAIStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
 	if match := VcpkgPkgDetailsRegex.FindStringSubmatch(line); match != nil {
-		pkgIdx := VcpkgPkgDetailsRegex.SubexpIndex("package")
-		versionIdx := VcpkgPkgDetailsRegex.SubexpIndex("version")
-		patchIdx := VcpkgPkgDetailsRegex.SubexpIndex("patch")
-
-		patchStr := match[patchIdx]
-		if patchStr == "" {
-			patchStr = "/NA"
-		}
-
-		var action string
-		if strings.ContainsAny(line, "install") {
-			action = "installing"
-		} else if strings.Contains(line, "rebuilt") {
-			action = "rebuilding"
-		} else if strings.Contains(line, "remove") {
-			action = "removing"
-		}
-
-		out := fmt.Sprintf("Now %s %s @ %s with vcpkg patch %s", action, match[pkgIdx], match[versionIdx], patchStr)
+		sendPackageDetails("Found installed", match, smPtr, eventsCh)
 		smPtr.VcpkgAlreadyInstalledCount += 1
-		send(out)
 		return CmexlVcpkgAIStateFn
 	}
 
+	if match := VcpkgNeedRemovedRegex.FindString(line); len(match) != 0 {
+		send("checking for packages that need to be removed", smPtr, eventsCh)
+		return CmexlVcpkgNRStateFn
+	}
+
 	if match := VcpkgNeedInstalledRegex.FindString(line); len(match) != 0 {
-		send("checking for packages that need to be installed")
+		send("checking for packages that need to be installed", smPtr, eventsCh)
 		return CmexlVcpkgNIStateFn
 	}
 
 	if match := VcpkgFailedRegex.FindString(line); len(match) != 0 {
-		send("vcpkg failed - check logs")
+		send("vcpkg failed - check logs", smPtr, eventsCh)
 		return CmexlDefaultStateFn
 	}
 	if match := VcpkgSuccessRegex.FindString(line); len(match) != 0 {
-		send("vcpkg success")
+		send("vcpkg success", smPtr, eventsCh)
 		return CmexlDefaultStateFn
 	}
-	// TODO: Put VcpkgInstalledDelimeterRegex here as a check and move into a new state where you stop counting
 
 	return CmexlVcpkgAIStateFn
 }
 
-func CmexlVcpkgStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
-	send := func(log string) {
-		cmakeLogEvent := NewLogLineEvent(smPtr.PrKey, log)
-		TrySend(eventsCh, cmakeLogEvent)
+// NR stands for need removed
+func CmexlVcpkgNRStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
+	if match := VcpkgPkgDetailsRegex.FindStringSubmatch(line); match != nil {
+		sendPackageDetails("Found needed to remove", match, smPtr, eventsCh)
+		smPtr.VcpkgNeedRemovedCount += 1
+		return CmexlVcpkgNRStateFn
 	}
+
+	if match := VcpkgNeedInstalledRegex.FindString(line); len(match) != 0 {
+		send("checking for packages that need to be installed", smPtr, eventsCh)
+		return CmexlVcpkgNIStateFn
+	}
+
+	if match := VcpkgInstalledDelimeterRegex.FindString(line); len(match) != 0 {
+		send(fmt.Sprintf("now building %d required packages and removing %d unecessary packages", smPtr.VcpkgNeedInstalledCount, smPtr.VcpkgNeedRemovedCount), smPtr, eventsCh)
+		return CmexlVcpkgWorkingStateFn
+	}
+	return CmexlVcpkgNRStateFn
+}
+
+func CmexlVcpkgStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
 	if match := VcpkgLockRegex.FindString(line); len(match) != 0 {
-		send("waiting for vcpkg lock")
+		send("waiting for vcpkg lock", smPtr, eventsCh)
 		return CmexlVcpkgStateFn
 	}
 	if match := VcpkgCompilerHashRegex.FindString(line); len(match) != 0 {
-		send("checking for change in build environment")
+		send("checking for change in build environment", smPtr, eventsCh)
 		return CmexlVcpkgStateFn
 	}
 
 	if match := VcpkgFailedRegex.FindString(line); len(match) != 0 {
-		send("vcpkg failed - check logs")
+		send("vcpkg failed - check logs", smPtr, eventsCh)
 		return CmexlDefaultStateFn
 	}
 	if match := VcpkgSuccessRegex.FindString(line); len(match) != 0 {
-		send("vcpkg success")
+		send("vcpkg success", smPtr, eventsCh)
 		return CmexlDefaultStateFn
 	}
 
-	if match := VcpkgNeedInstalledRegex.FindString(line); len(match) != 0 {
-		send("checking for packages that need to be installed")
-		return CmexlVcpkgNIStateFn
+	if match := VcpkgAlreadyInstalledRegex.FindString(line); len(match) != 0 {
+		send("checking for already installed packages", smPtr, eventsCh)
+		return CmexlVcpkgAIStateFn
 	}
 
-	if match := VcpkgAlreadyInstalledRegex.FindString(line); len(match) != 0 {
-		send("checking for already installed packages")
-		return CmexlVcpkgAIStateFn
+	if match := VcpkgNeedRemovedRegex.FindString(line); len(match) != 0 {
+		send("checking for packages that need to be removed", smPtr, eventsCh)
+		return CmexlVcpkgNRStateFn
+	}
+
+	if match := VcpkgNeedInstalledRegex.FindString(line); len(match) != 0 {
+		send("checking for packages that need to be installed", smPtr, eventsCh)
+		return CmexlVcpkgNIStateFn
 	}
 
 	return CmexlVcpkgStateFn
 }
 
 func CmexlDefaultStateFn(line string, smPtr *CmexlStateMachine, eventsCh chan<- CmexlEvent) CmexlStateFunc {
-	send := func(log string) {
-		cmakeLogEvent := NewLogLineEvent(smPtr.PrKey, log)
-		TrySend(eventsCh, cmakeLogEvent)
-	}
-
 	if match := VcpkgStartRegex.FindString(line); len(match) != 0 {
-		send("starting vcpkg")
+		send("starting vcpkg", smPtr, eventsCh)
 		return CmexlVcpkgStateFn
 	}
 	if match := CmexlRegex.FindStringSubmatch(line); match != nil {
 		logIdx := CmexlRegex.SubexpIndex("log")
 		out := match[logIdx]
-		send(out)
+		send(out, smPtr, eventsCh)
 	}
 	return CmexlDefaultStateFn
 }

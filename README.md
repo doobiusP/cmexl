@@ -61,22 +61,19 @@ Once Go is installed and configured, you can build the cmexl executable:
 Get a new C++/CMake project running and test its cross-compilation support in a few steps.
 
 1.  **Initialize a new project**
-    Use `cmexl init` to bootstrap a new project from a template. This command automatically sets up CMake and vcpkg integration.
+    Use `cmexl init` to bootstrap a new CMake project with automatic vcpkg integration that comes setup with a few Boost libraries (can be disabled by supplying `--no-vcpkg` flag)
 
     ```bash
-    # Creates a new project: Formal name "MyGreatLibrary", identifier "my-great-lib", using the 'default-tpl' template.
-    cmexl init --name "My Great Library" --short-name my-great-lib --template default-tpl
+    cmexl init --name "MyLib1" --template "cmake_lib"
+    cd MyLib1
+    ./cmexl_bootstrap.bat
     ```
 
-2.  **Run a parallel build and test schedule**
-    Use `cmexl schedule` to execute a group of CMake presets in parallel, which will automatically fetch dependencies and run cross-compilation tests.
+2.  **Run a parallel build**
+    Use `cmexl schedule` to execute a group of CMake presets in parallel, which will automatically fetch dependencies and build target binaries
 
     ```bash
-    # Build all presets defined in the 'msvc-all-configs' group
-    cmexl schedule --group msvc-all-configs --type build
-
-    # Run the tests for the default preset group
-    cmexl schedule --type test
+    cmexl schedule -t workflow win-dev win-rel
     ```
 
 ## 3. Work in progress

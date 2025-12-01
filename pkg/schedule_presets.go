@@ -356,13 +356,13 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	fmt.Println("Packages")
 	fmt.Println("==============")
 	for key, val := range cmexlExecStates {
-		fmt.Printf("{%s, %s}: Already installed: %d, Needed installation/removal: %d\n", key.Name, key.Type.String(), val.VcpkgAlreadyInstalledCount, val.VcpkgNeedInstalledCount)
+		fmt.Printf("{%s, %s}: Already installed: %d, Needed removal: %d, Needed installation: %d\n", key.Name, key.Type.String(), val.VcpkgAlreadyInstalledCount, val.VcpkgNeedRemovedCount, val.VcpkgNeedInstalledCount)
 	}
 
 	fmt.Println("Error Report")
 	fmt.Println("==============")
 	if len(errReport) <= 0 {
-		fmt.Print("none")
+		fmt.Println("none")
 	} else {
 		for prKey, errList := range errReport {
 			for _, err := range errList {
