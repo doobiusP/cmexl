@@ -25,6 +25,7 @@ var (
 	VcpkgFailedRegex  = regexp.MustCompile(`Running vcpkg install - failed`)
 	VcpkgSuccessRegex = regexp.MustCompile(`Running vcpkg install - done`)
 
+	StderrFileRegex       = regexp.MustCompile(`(?i)\berror\b|\bfail\b`)
 	VcpkgManifestLogRegex = regexp.MustCompile(`(?P<manifest_log>\S*vcpkg-manifest-install\.log)`)
 )
 

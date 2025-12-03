@@ -128,7 +128,6 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 		select {
 		case <-parentCtx.Done():
 			cmakeCmd.Process.Signal(os.Interrupt)
-			// _ = cmakeCmd.Process.Kill()
 			TrySend(eventsCh, NewExecExitEvent(prKey, parentCtx.Err(), err))
 		default:
 			if err != nil {
@@ -216,7 +215,7 @@ func updateState(ev CmexlEvent, cmexlDataMap map[PresetInfoKey]CmexlPresetData, 
 		exitStatus := ev.Payload.(ExecExitPayload)
 		s := logDoubleBuffer[cur][ev.Key]
 		if exitStatus.Err != nil || exitStatus.ExitCode != nil {
-			err := fmt.Errorf("error after execution: %w, %w", exitStatus.Err, exitStatus.ExitCode)
+			err := fmt.Errorf("error after execution: check error report later, %s", exitStatus.ExitCode)
 			s.Log = err.Error()
 			v := cmexlDataMap[ev.Key]
 			v.Errors = append(v.Errors, err)
@@ -283,6 +282,45 @@ func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}, keys []PresetInfoKey) 
 	}
 }
 
+func printKnownErrors(prKey PresetInfoKey) {
+	errLog := fmt.Sprintf(".cmexl/stderr/%s.log", prKey.Name)
+	errFile, err := os.Open(errLog)
+	if err != nil {
+		panic("can't open error log")
+	}
+	defer errFile.Close()
+
+	scanner := bufio.NewScanner(errFile)
+	var vcpkgManifestLog string
+
+	fmt.Printf("(%s,%s):\n", prKey.Name, prKey.Type)
+	fmt.Printf("Checking %s\n", errLog)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if match := VcpkgManifestLogRegex.FindStringSubmatch(line); match != nil {
+			vcpkgManifestLog = match[VcpkgManifestLogRegex.SubexpIndex("manifest_log")]
+		}
+		if StderrFileRegex.MatchString(line) {
+			fmt.Println(line)
+		}
+	}
+
+	if vcpkgManifestLog != "" {
+		fmt.Printf("Checking vcpkg-manifest-log: %s\n", vcpkgManifestLog)
+		manifestFile, err := os.Open(vcpkgManifestLog)
+		if err != nil {
+			panic("can't open vcpkg manifest log")
+		}
+		scanner := bufio.NewScanner(manifestFile)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if StderrFileRegex.MatchString(line) {
+				fmt.Println(line)
+			}
+		}
+	}
+}
+
 func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetMap_t, flags ScheduleFlags) error {
 	numPrs := len(prKeys)
 	if numPrs < 1 {
@@ -302,7 +340,6 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 
 	var cmakeWg sync.WaitGroup
 	cmakeWg.Add(numPrs)
-
 	var uiWg sync.WaitGroup
 	uiWg.Add(1)
 
@@ -375,22 +412,22 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	uiWg.Wait()
 
 	// TODO: Remove this for projects that dont need vcpkg. Will have to read from viper for this
-	fmt.Println("Packages\r")
-	fmt.Println("==============\r")
+	fmt.Println("Packages")
+	fmt.Println("==============")
 	for key, val := range cmexlDataMap {
-		fmt.Printf("{%s, %s}: Already installed: %d, Needed removal: %d, Needed installation: %d\r\n",
+		fmt.Printf("(%s, %s): Already installed: %d, Needed removal: %d, Needed installation: %d\n",
 			key.Name, key.Type.String(),
 			val.ExecState.VcpkgAlreadyInstalledCount,
 			val.ExecState.VcpkgNeedRemovedCount,
 			val.ExecState.VcpkgNeedInstalledCount)
 	}
 
-	fmt.Println("Error Report\r")
-	fmt.Println("==============\r")
+	fmt.Println("Error Report")
+	fmt.Println("==============")
 
 	for prKey, data := range cmexlDataMap {
-		for _, err := range data.Errors {
-			fmt.Printf("{%s, %v}: %s\r\n", prKey.Name, prKey.Type, err)
+		if len(data.Errors) > 0 {
+			printKnownErrors(prKey)
 		}
 	}
 	return nil
