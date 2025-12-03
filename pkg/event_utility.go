@@ -81,6 +81,14 @@ type DisplayState struct {
 	ElapsedTime float64
 }
 
+type CmexlPresetData struct {
+	Errors    []error
+	ExecState *CmexlStateMachine
+	EventsLog *os.File
+	StdoutLog *os.File
+	StderrLog *os.File
+}
+
 func (e CmexlEvent) String() string {
 	var eventInfo string
 	switch e.Type {
@@ -326,6 +334,12 @@ func CreateCmexlStore(flags ScheduleFlags) error {
 	if err != nil {
 		return err
 	}
+
+	err = os.MkdirAll(".cmexl/stderr", 0755)
+	if err != nil {
+		return err
+	}
+
 	if *flags.SaveEvents {
 		err = os.MkdirAll(".cmexl/events", 0755)
 	}

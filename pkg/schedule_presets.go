@@ -88,27 +88,28 @@ func startCmakeTicker(parentCtx context.Context, eventsCh chan<- CmexlEvent, prK
 	}
 }
 
-func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, wg *sync.WaitGroup, cmexlStateMap map[PresetInfoKey]*CmexlStateMachine, flags ScheduleFlags) error {
+func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, prKey PresetInfoKey, wg *sync.WaitGroup, cmexlDataMap map[PresetInfoKey]CmexlPresetData, flags ScheduleFlags) error {
 	cmakeCmd, err := getCmakeCommand(parentCtx, prKey, flags)
 	if err != nil {
 		return err
 	}
-	filename := fmt.Sprintf(".cmexl/%s.log", prKey.Name)
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
+
 	cmdStateMachinePtr := new(CmexlStateMachine)
 	cmdStateMachinePtr.PrKey = prKey
-	cmexlStateMap[prKey] = cmdStateMachinePtr
 
-	stopTicker := startCmakeTicker(parentCtx, eventsCh, prKey, tickerFreqHz)
+	v := cmexlDataMap[prKey]
+	v.ExecState = cmdStateMachinePtr
+	cmexlDataMap[prKey] = v
 
+	file := cmexlDataMap[prKey].StdoutLog
 	stdout, err := cmakeCmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("stdoutpipe: %w", err)
 	}
 
+	cmakeCmd.Stderr = cmexlDataMap[prKey].StderrLog
+
+	stopTicker := startCmakeTicker(parentCtx, eventsCh, prKey, tickerFreqHz)
 	if err := cmakeCmd.Start(); err != nil {
 		return fmt.Errorf("failed to start cmake: %w", err)
 	}
@@ -126,7 +127,8 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 		err := cmakeCmd.Wait()
 		select {
 		case <-parentCtx.Done():
-			_ = cmakeCmd.Process.Kill()
+			cmakeCmd.Process.Signal(os.Interrupt)
+			// _ = cmakeCmd.Process.Kill()
 			TrySend(eventsCh, NewExecExitEvent(prKey, parentCtx.Err(), err))
 		default:
 			if err != nil {
@@ -139,8 +141,9 @@ func startCMakeCommand(parentCtx context.Context, eventsCh chan<- CmexlEvent, pr
 
 	go func() {
 		sc := bufio.NewScanner(stdout)
+
 		buf := make([]byte, 0, 64*1024)
-		sc.Buffer(buf, 1<<20) // ~1 MB
+		sc.Buffer(buf, 2<<20) // ~2 MB
 		cmexlStateFn := CmexlDefaultStateFn
 
 		for sc.Scan() {
@@ -184,7 +187,7 @@ func init() {
 	logDoubleBuffer[1] = make(map[PresetInfoKey]DisplayState)
 }
 
-func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error, eventsLogMap map[PresetInfoKey]*os.File, flags ScheduleFlags) {
+func updateState(ev CmexlEvent, cmexlDataMap map[PresetInfoKey]CmexlPresetData, flags ScheduleFlags) {
 	cur := activeIndex.Load()
 	next := (cur + 1) % 2
 
@@ -206,14 +209,18 @@ func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error, eventsLogMa
 		s := logDoubleBuffer[cur][ev.Key]
 		s.Log = fmt.Sprintf("error during execution: %s", err)
 		logDoubleBuffer[next][ev.Key] = s
-		errReport[ev.Key] = append(errReport[ev.Key], err)
+		v := cmexlDataMap[ev.Key]
+		v.Errors = append(v.Errors, err)
+		cmexlDataMap[ev.Key] = v
 	case ExecExit:
 		exitStatus := ev.Payload.(ExecExitPayload)
 		s := logDoubleBuffer[cur][ev.Key]
 		if exitStatus.Err != nil || exitStatus.ExitCode != nil {
 			err := fmt.Errorf("error after execution: %w, %w", exitStatus.Err, exitStatus.ExitCode)
 			s.Log = err.Error()
-			errReport[ev.Key] = append(errReport[ev.Key], err)
+			v := cmexlDataMap[ev.Key]
+			v.Errors = append(v.Errors, err)
+			cmexlDataMap[ev.Key] = v
 		} else {
 			s.Log = "no errors occurred after execution"
 		}
@@ -224,7 +231,7 @@ func updateState(ev CmexlEvent, errReport map[PresetInfoKey][]error, eventsLogMa
 	if *flags.SaveEvents {
 		switch ev.Type {
 		case LogLineUpdate, ExecErr, ExecExit:
-			file := eventsLogMap[ev.Key]
+			file := cmexlDataMap[ev.Key].EventsLog
 			evLog := fmt.Sprintf("%fs : %s\n", logDoubleBuffer[next][ev.Key].ElapsedTime, ev)
 			if _, err := file.WriteString(evLog); err != nil {
 				panicMsg := fmt.Sprintf("failed to write event log (%s) for {%s,%s}", evLog, ev.Key.Name, ev.Key.Type)
@@ -253,12 +260,12 @@ func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}, keys []PresetInfoKey) 
 		snapshot := getActiveBuffer()
 
 		var frameData strings.Builder
-		frameData.WriteString("Preset Status\n")
-		frameData.WriteString("==============\n")
+		frameData.WriteString("Preset Status\r\n")
+		frameData.WriteString("==============\r\n")
 
 		for i, k := range keys {
 			v := snapshot[k]
-			fmt.Fprintf(&frameData, "%d. %s (%v, %.2fs) : %s\n", i+1, k.Name, k.Type, v.ElapsedTime, v.Log)
+			fmt.Fprintf(&frameData, "%d. %s (%v, %.2fs) : %s\r\n", i+1, k.Name, k.Type, v.ElapsedTime, strings.TrimRight(v.Log, "\r\n"))
 		}
 
 		fmt.Print(cursorHome, clearFromCursor)
@@ -302,40 +309,55 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	errReport := make(map[PresetInfoKey][]error)
-	cmexlExecStates := make(map[PresetInfoKey]*CmexlStateMachine, numPrs)
-	eventsLogMap := make(map[PresetInfoKey]*os.File, numPrs)
+	cmexlDataMap := make(map[PresetInfoKey]CmexlPresetData, numPrs)
 
 	err := CreateCmexlStore(flags)
 	if err != nil {
 		return err
 	}
-
-	addErrToReport := func(err error, key PresetInfoKey) {
-		errReport[key] = append(errReport[key], fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
-	}
-
 	// Beyond this point, we should not abruptly halt this parent process since we want any working preset to at least finish
 	for _, key := range prKeys {
-		if *flags.SaveEvents {
-			filename := fmt.Sprintf(".cmexl/events/%s.log", key.Name)
-			file, err := os.Create(filename)
-			if err != nil {
-				addErrToReport(err, key)
-			}
-			eventsLogMap[key] = file
-			defer file.Close()
+		v := cmexlDataMap[key]
+		errFilename := fmt.Sprintf(".cmexl/stderr/%s.log", key.Name)
+		errFile, err := os.Create(errFilename)
+		if err != nil {
+			v.Errors = append(v.Errors,
+				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
 		}
-		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlExecStates, flags)
+		v.StderrLog = errFile
+		defer errFile.Close()
+
+		outFilename := fmt.Sprintf(".cmexl/%s.log", key.Name)
+		outFile, err := os.Create(outFilename)
+		if err != nil {
+			v.Errors = append(v.Errors,
+				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+		}
+		v.StdoutLog = outFile
+		defer outFile.Close()
+
+		if *flags.SaveEvents {
+			eventFilename := fmt.Sprintf(".cmexl/events/%s.log", key.Name)
+			eventFile, err := os.Create(eventFilename)
+			if err != nil {
+				v.Errors = append(v.Errors,
+					fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+			}
+			v.EventsLog = eventFile
+			defer eventFile.Close()
+		}
+		cmexlDataMap[key] = v
+		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlDataMap, flags)
 		if initErr != nil {
-			addErrToReport(initErr, key)
+			v.Errors = append(v.Errors,
+				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
 		}
 
 	}
 
 	go func() {
 		for ev := range eventsCh {
-			updateState(ev, errReport, eventsLogMap, flags)
+			updateState(ev, cmexlDataMap, flags)
 		}
 	}()
 
@@ -346,28 +368,29 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	cmakeWg.Wait()
 	for len(eventsCh) > 0 {
 		ev := <-eventsCh
-		updateState(ev, errReport, eventsLogMap, flags)
+		updateState(ev, cmexlDataMap, flags)
 	}
 	close(eventsCh)
 	close(uiDone)
 	uiWg.Wait()
 
 	// TODO: Remove this for projects that dont need vcpkg. Will have to read from viper for this
-	fmt.Println("Packages")
-	fmt.Println("==============")
-	for key, val := range cmexlExecStates {
-		fmt.Printf("{%s, %s}: Already installed: %d, Needed removal: %d, Needed installation: %d\n", key.Name, key.Type.String(), val.VcpkgAlreadyInstalledCount, val.VcpkgNeedRemovedCount, val.VcpkgNeedInstalledCount)
+	fmt.Println("Packages\r")
+	fmt.Println("==============\r")
+	for key, val := range cmexlDataMap {
+		fmt.Printf("{%s, %s}: Already installed: %d, Needed removal: %d, Needed installation: %d\r\n",
+			key.Name, key.Type.String(),
+			val.ExecState.VcpkgAlreadyInstalledCount,
+			val.ExecState.VcpkgNeedRemovedCount,
+			val.ExecState.VcpkgNeedInstalledCount)
 	}
 
-	fmt.Println("Error Report")
-	fmt.Println("==============")
-	if len(errReport) <= 0 {
-		fmt.Println("none")
-	} else {
-		for prKey, errList := range errReport {
-			for _, err := range errList {
-				fmt.Printf("{%s, %v}: %s\n", prKey.Name, prKey.Type, err)
-			}
+	fmt.Println("Error Report\r")
+	fmt.Println("==============\r")
+
+	for prKey, data := range cmexlDataMap {
+		for _, err := range data.Errors {
+			fmt.Printf("{%s, %v}: %s\r\n", prKey.Name, prKey.Type, err)
 		}
 	}
 	return nil
