@@ -61,6 +61,34 @@
       }
     },
     {
+      "name": "vs-msvc-dll",
+      "inherits": "{{.LName}}-base",
+      "generator": "Visual Studio 17 2022",
+      "displayName": "Visual Studio w/ MSVC (x64)",
+      "cacheVariables": {
+        "CMAKE_GENERATOR_PLATFORM": "x64",
+        "{{.UName}}_BUILD_TESTS": "ON",
+        "BUILD_SHARED_LIBS": "ON"
+{{if .UseVcpkg}}
+        ,"VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+{{end}}
+      }
+    },
+    {
+      "name": "x86-vs-msvc-dll",
+      "inherits": "{{.LName}}-base",
+      "generator": "Visual Studio 17 2022",
+      "displayName": "Visual Studio w/ MSVC (x86)",
+      "cacheVariables": {
+        "CMAKE_GENERATOR_PLATFORM": "Win32",
+        "{{.UName}}_BUILD_TESTS": "ON",
+        "BUILD_SHARED_LIBS": "ON"
+{{if .UseVcpkg}}
+        ,"VCPKG_TARGET_TRIPLET": "x86-windows-static-md"
+{{end}}
+      }
+    },
+    {
       "name": "x64-linux-dbg-gcc",
       "inherits": "{{.LName}}-base",
       "displayName": "Ninja w/ GCC (x64)(Debug)",
@@ -85,6 +113,41 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "{{.UName}}_USE_ADDR2LINE": "ON",
+{{if .UseVcpkg}}
+        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{else}}
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{end}}
+      }
+    },
+    {
+      "name": "x64-linux-dbg-gcc-dll",
+      "inherits": "{{.LName}}-base",
+      "displayName": "Ninja w/ GCC (x64)(Debug)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "{{.UName}}_BUILD_TESTS": "ON",
+        "{{.UName}}_USE_BACKTRACE": "ON",
+        "BUILD_SHARED_LIBS": "ON",
+{{if .UseVcpkg}}
+        "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{else}}
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
+{{end}}
+      }
+    },
+    {
+      "name": "x64-linux-rel-gcc-dll",
+      "inherits": "{{.LName}}-base",
+      "displayName": "Ninja w/ GCC (x64)(Release)",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "{{.UName}}_USE_ADDR2LINE": "ON",
+        "BUILD_SHARED_LIBS": "ON",
 {{if .UseVcpkg}}
         "VCPKG_TARGET_TRIPLET": "x64-linux-static-md",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-linux-static-md.toolchain.cmake"
@@ -129,48 +192,102 @@
   ],
   "buildPresets": [
     {
-      "name": "vs-msvc-debug",
-      "displayName": "Build w/ MSVC (x64)(Debug)",
-      "configurePreset": "vs-msvc",
+      "name": "build-base-dbg",
+      "hidden": true,
       "jobs": 4,
-      "configuration": "Debug",
-      "verbose": true
+      "verbose": true,
+      "configuration": "Debug"
+    },
+    {
+      "name": "build-base-rel",
+      "hidden": true,
+      "jobs": 4,
+      "verbose": true,
+      "configuration": "Release"
+    },
+    {
+      "name": "vs-msvc-debug",
+      "inherits": "build-base-dbg",
+      "displayName": "Build w/ MSVC (x64)(Debug)",
+      "configurePreset": "vs-msvc"
+    },
+    {
+      "name": "x86-vs-msvc-debug",
+      "inherits": "build-base-dbg",
+      "displayName": "Build w/ MSVC (x86)(Debug)",
+      "configurePreset": "x86-vs-msvc"
     },
     {
       "name": "vs-msvc-release",
+      "inherits": "build-base-rel",
       "displayName": "Build w/ MSVC (x64)(Release)",
-      "configurePreset": "vs-msvc",
-      "jobs": 4,
-      "configuration": "Release",
-      "verbose": true
+      "configurePreset": "vs-msvc"
+    },
+    {
+      "name": "x86-vs-msvc-release",
+      "inherits": "build-base-rel",
+      "displayName": "Build w/ MSVC (x86)(Release)",
+      "configurePreset": "x86-vs-msvc"
+    },
+    {
+      "name": "vs-msvc-debug-dll",
+      "inherits": "build-base-dbg",
+      "displayName": "Build w/ MSVC (x64)(Debug)",
+      "configurePreset": "vs-msvc-dll"
+    },
+    {
+      "name": "x86-vs-msvc-debug-dll",
+      "inherits": "build-base-dbg",
+      "displayName": "Build w/ MSVC (x86)(Debug)",
+      "configurePreset": "x86-vs-msvc-dll"
+    },
+    {
+      "name": "vs-msvc-release-dll",
+      "inherits": "build-base-rel",
+      "displayName": "Build w/ MSVC (x64)(Release)",
+      "configurePreset": "vs-msvc-dll"
+    },
+    {
+      "name": "x86-vs-msvc-release-dll",
+      "inherits": "build-base-rel",
+      "displayName": "Build w/ MSVC (x86)(Release)",
+      "configurePreset": "x86-vs-msvc-dll"
     },
     {
       "name": "x64-linux-dbg-gcc",
+      "inherits": "build-base-dbg",
       "displayName": "Build w/ Ninja and GCC (x64)(Debug)",
-      "configurePreset": "x64-linux-dbg-gcc",
-      "jobs": 4,
-      "verbose": true
+      "configurePreset": "x64-linux-dbg-gcc"
     },
     {
       "name": "x64-linux-rel-gcc",
+      "inherits": "build-base-rel",
       "displayName": "Build w/ Ninja and GCC (x64)(Release)",
-      "configurePreset": "x64-linux-rel-gcc",
-      "jobs": 4,
-      "verbose": true
+      "configurePreset": "x64-linux-rel-gcc"
+    },
+    {
+      "name": "x64-linux-dbg-gcc-dll",
+      "inherits": "build-base-dbg",
+      "displayName": "Build w/ Ninja and GCC (x64)(Debug)",
+      "configurePreset": "x64-linux-dbg-gcc-dll"
+    },
+    {
+      "name": "x64-linux-rel-gcc-dll",
+      "inherits": "build-base-rel",
+      "displayName": "Build w/ Ninja and GCC (x64)(Release)",
+      "configurePreset": "x64-linux-rel-gcc-dll"
     },
     {
       "name": "x64-mingw64-dbg",
+      "inherits": "build-base-dbg",
       "displayName": "Build w/ Ninja and x86_64-w64-mingw32-g++posix (x64)(Debug)",
-      "configurePreset": "x64-mingw64-dbg",
-      "jobs": 4,
-      "verbose": true
+      "configurePreset": "x64-mingw64-dbg"
     },
     {
       "name": "x64-linux-clang-dbg",
+      "inherits": "build-base-dbg",
       "displayName": "Build w/ Ninja and clang (x64)(Debug)",
-      "configurePreset": "x64-linux-clang-dbg",
-      "jobs": 4,
-      "verbose": true
+      "configurePreset": "x64-linux-clang-dbg"
     }
   ],
   "workflowPresets": [
@@ -203,6 +320,90 @@
       ]
     },
     {
+      "name": "x86-win-dev",
+      "displayName": "Workflow for Windows w/ MSVC (x86)(Debug)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "x86-vs-msvc"
+        },
+        {
+          "type": "build",
+          "name": "x86-vs-msvc-debug"
+        }
+      ]
+    },
+    {
+      "name": "x86-win-rel",
+      "displayName": "Workflow for Windows w/ MSVC (x86)(Release)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "x86-vs-msvc"
+        },
+        {
+          "type": "build",
+          "name": "x86-vs-msvc-release"
+        }
+      ]
+    },
+    {
+      "name": "win-dev-dll",
+      "displayName": "Workflow for Windows w/ MSVC (x64)(Debug)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "vs-msvc-dll"
+        },
+        {
+          "type": "build",
+          "name": "vs-msvc-debug-dll"
+        }
+      ]
+    },
+    {
+      "name": "win-rel-dll",
+      "displayName": "Workflow for Windows w/ MSVC (x64)(Release)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "vs-msvc-dll"
+        },
+        {
+          "type": "build",
+          "name": "vs-msvc-release-dll"
+        }
+      ]
+    },
+    {
+      "name": "x86-win-dev-dll",
+      "displayName": "Workflow for Windows w/ MSVC (x86)(Debug)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "x86-vs-msvc-dll"
+        },
+        {
+          "type": "build",
+          "name": "x86-vs-msvc-debug-dll"
+        }
+      ]
+    },
+    {
+      "name": "x86-win-rel-dll",
+      "displayName": "Workflow for Windows w/ MSVC (x86)(Release)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "x86-vs-msvc-dll"
+        },
+        {
+          "type": "build",
+          "name": "x86-vs-msvc-release-dll"
+        }
+      ]
+    },
+    {
       "name": "linux-dev",
       "displayName": "Workflow for Linux w/ Ninja+GCC (x64)(Debug)",
       "steps": [
@@ -227,6 +428,34 @@
         {
           "type": "build",
           "name": "x64-linux-rel-gcc"
+        }
+      ]
+    },
+    {
+      "name": "linux-dev-dll",
+      "displayName": "Workflow for Linux w/ Ninja+GCC (x64)(Debug)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "x64-linux-dbg-gcc-dll"
+        },
+        {
+          "type": "build",
+          "name": "x64-linux-dbg-gcc-dll"
+        }
+      ]
+    },
+    {
+      "name": "linux-rel-dll",
+      "displayName": "Workflow for Linux w/ Ninja+GCC (x64)(Release)",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "x64-linux-rel-gcc-dll"
+        },
+        {
+          "type": "build",
+          "name": "x64-linux-rel-gcc-dll"
         }
       ]
     },

@@ -1,0 +1,33 @@
+{
+    "init_settings": {
+        "name": "{{.Name}}",
+        "sname": "{{.SName}}",
+        "lname": "{{.LName}}",
+        "uname": "{{.UName}}",
+        "use_vcpkg": "{{.UseVcpkg}}"
+    },
+    "tasks": [
+        {
+            "name": "win",
+            "workflows": [
+                "win-dev",
+                "win-rel",
+                "x86-win-dev",
+                "x86-win-rel",
+                "win-dev-dll",
+                "win-rel-dll",
+                "x86-win-dev-dll",
+                "x86-win-rel-dll"
+            ]
+        },
+        {
+            "name": "linux",
+            "workflows": [
+                "linux-dev",
+                "linux-rel",
+                "mingw-dev",
+                "clang-dev"
+            ]
+        }
+    ]
+}

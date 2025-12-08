@@ -29,6 +29,7 @@ var (
 type ScheduleFlags struct {
 	SaveEvents *bool
 	Refresh    *bool
+	Serial     *bool
 }
 
 func getCmakeCommand(ctx context.Context, prKey PresetInfoKey, flags ScheduleFlags) (*exec.Cmd, error) {
@@ -321,6 +322,68 @@ func printKnownErrors(prKey PresetInfoKey) {
 	}
 }
 
+// func ScheduleSerialPresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetMap_t, flags ScheduleFlags) error {
+// 	numPrs := len(prKeys)
+// 	if numPrs < 1 {
+// 		return errors.New("no presets to execute")
+// 	}
+// 	sort.Slice(prKeys, func(i, j int) bool {
+// 		ni, nj := prKeys[i].Name, prKeys[j].Name
+// 		if ni == nj {
+// 			return prKeys[i].Type < prKeys[j].Type
+// 		}
+// 		return ni < nj
+// 	})
+
+// 	err := CreateCmexlStore(flags)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	ctx, cancel := context.WithCancel(context.Background())
+// 	defer cancel()
+// 	cmexlDataMap := make(map[PresetInfoKey]CmexlPresetData, numPrs)
+// 	var cmexlPresetLock sync.Mutex
+
+// 	for _, key := range prKeys {
+// 		v := cmexlDataMap[key]
+// 		errFilename := fmt.Sprintf(".cmexl/stderr/%s.log", key.Name)
+// 		errFile, err := os.Create(errFilename)
+// 		if err != nil {
+// 			v.Errors = append(v.Errors,
+// 				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+// 		}
+// 		v.StderrLog = errFile
+// 		defer errFile.Close()
+
+// 		outFilename := fmt.Sprintf(".cmexl/%s.log", key.Name)
+// 		outFile, err := os.Create(outFilename)
+// 		if err != nil {
+// 			v.Errors = append(v.Errors,
+// 				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+// 		}
+// 		v.StdoutLog = outFile
+// 		defer outFile.Close()
+
+// 		if *flags.SaveEvents {
+// 			eventFilename := fmt.Sprintf(".cmexl/events/%s.log", key.Name)
+// 			eventFile, err := os.Create(eventFilename)
+// 			if err != nil {
+// 				v.Errors = append(v.Errors,
+// 					fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+// 			}
+// 			v.EventsLog = eventFile
+// 			defer eventFile.Close()
+// 		}
+// 		cmexlDataMap[key] = v
+// 		err := startSerialCMakeCommand(ctx, eventsCh, key, &cmexlPresetLock, cmexlDataMap, flags)
+// 		if err != nil {
+// 			v.Errors = append(v.Errors,
+// 				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+// 		}
+// 	}
+// }
+
 func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetMap_t, flags ScheduleFlags) error {
 	numPrs := len(prKeys)
 	if numPrs < 1 {
@@ -335,11 +398,21 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 		return ni < nj
 	})
 
+	err := CreateCmexlStore(flags)
+	if err != nil {
+		return err
+	}
 	eventChSize := numPrs * (int(math.Ceil(float64(tickerFreqHz))) + 1) * eventChannelSizeScale
 	eventsCh := make(chan CmexlEvent, eventChSize)
 
 	var cmakeWg sync.WaitGroup
-	cmakeWg.Add(numPrs)
+
+	if *flags.Serial {
+		cmakeWg.Add(1)
+	} else {
+		cmakeWg.Add(numPrs)
+	}
+
 	var uiWg sync.WaitGroup
 	uiWg.Add(1)
 
@@ -348,11 +421,15 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 
 	cmexlDataMap := make(map[PresetInfoKey]CmexlPresetData, numPrs)
 
-	err := CreateCmexlStore(flags)
-	if err != nil {
-		return err
-	}
-	// Beyond this point, we should not abruptly halt this parent process since we want any working preset to at least finish
+	go func() {
+		for ev := range eventsCh {
+			updateState(ev, cmexlDataMap, flags)
+		}
+	}()
+
+	uiDone := make(chan struct{})
+	go drawUI(&uiWg, uiDone, prKeys)
+
 	for _, key := range prKeys {
 		v := cmexlDataMap[key]
 		errFilename := fmt.Sprintf(".cmexl/stderr/%s.log", key.Name)
@@ -384,25 +461,33 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 			defer eventFile.Close()
 		}
 		cmexlDataMap[key] = v
-		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlDataMap, flags)
-		if initErr != nil {
-			v.Errors = append(v.Errors,
-				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
-		}
 
+		if *flags.Serial {
+			TrySend(eventsCh, NewLogLineEvent(key, "waiting for cmexl lock"))
+		}
 	}
 
-	go func() {
-		for ev := range eventsCh {
-			updateState(ev, cmexlDataMap, flags)
+	// Beyond this point, we should not abruptly halt this parent process since
+	// we want any working preset to at least finish in case of parallel build
+	for _, key := range prKeys {
+		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlDataMap, flags)
+		if *flags.Serial {
+			cmakeWg.Wait()
+			cmakeWg.Add(1)
 		}
-	}()
-
-	uiDone := make(chan struct{})
-	go drawUI(&uiWg, uiDone, prKeys)
+		if initErr != nil {
+			v := cmexlDataMap[key]
+			v.Errors = append(v.Errors,
+				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
+			cmexlDataMap[key] = v
+		}
+	}
 
 	// event draining
-	cmakeWg.Wait()
+	if !(*flags.Serial) {
+		cmakeWg.Wait()
+	}
+
 	for len(eventsCh) > 0 {
 		ev := <-eventsCh
 		updateState(ev, cmexlDataMap, flags)
