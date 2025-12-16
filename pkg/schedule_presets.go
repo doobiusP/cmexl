@@ -13,6 +13,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fatih/color"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -28,7 +31,6 @@ var (
 
 type ScheduleFlags struct {
 	SaveEvents *bool
-	Refresh    *bool
 	Serial     *bool
 }
 
@@ -52,9 +54,6 @@ func getCmakeCommand(ctx context.Context, prKey PresetInfoKey, flags ScheduleFla
 	}
 	cmakeArgs = append(cmakeArgs, "--preset")
 	cmakeArgs = append(cmakeArgs, prKey.Name)
-	if *flags.Refresh {
-		cmakeArgs = append(cmakeArgs, "--fresh")
-	}
 
 	return exec.CommandContext(ctx, cmakeCmd, cmakeArgs...), nil
 }
@@ -284,25 +283,42 @@ func drawUI(uiWg *sync.WaitGroup, uiDone <-chan struct{}, keys []PresetInfoKey) 
 }
 
 func printKnownErrors(prKey PresetInfoKey) {
+	outLog := fmt.Sprintf(".cmexl/%s.log", prKey.Name)
+	outFile, err := os.Open(outLog)
+	if err != nil {
+		panic("can't open stdout log")
+	}
+	defer outFile.Close()
+
+	scanner := bufio.NewScanner(outFile)
+
+	color.Yellow("(%s,%s):\n", prKey.Name, prKey.Type)
+	fmt.Printf("Checking %s\n", outLog)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if errLogRegex.MatchString(line) {
+			fmt.Println("\t" + line)
+		}
+	}
+
 	errLog := fmt.Sprintf(".cmexl/stderr/%s.log", prKey.Name)
 	errFile, err := os.Open(errLog)
 	if err != nil {
-		panic("can't open error log")
+		panic("can't open stderr log")
 	}
 	defer errFile.Close()
 
-	scanner := bufio.NewScanner(errFile)
+	scanner = bufio.NewScanner(errFile)
 	var vcpkgManifestLog string
 
-	fmt.Printf("(%s,%s):\n", prKey.Name, prKey.Type)
 	fmt.Printf("Checking %s\n", errLog)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if match := VcpkgManifestLogRegex.FindStringSubmatch(line); match != nil {
 			vcpkgManifestLog = match[VcpkgManifestLogRegex.SubexpIndex("manifest_log")]
 		}
-		if StderrFileRegex.MatchString(line) {
-			fmt.Println(line)
+		if errLogRegex.MatchString(line) {
+			fmt.Println("\t" + line)
 		}
 	}
 
@@ -315,74 +331,12 @@ func printKnownErrors(prKey PresetInfoKey) {
 		scanner := bufio.NewScanner(manifestFile)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if StderrFileRegex.MatchString(line) {
-				fmt.Println(line)
+			if errLogRegex.MatchString(line) {
+				fmt.Println("\t" + line)
 			}
 		}
 	}
 }
-
-// func ScheduleSerialPresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetMap_t, flags ScheduleFlags) error {
-// 	numPrs := len(prKeys)
-// 	if numPrs < 1 {
-// 		return errors.New("no presets to execute")
-// 	}
-// 	sort.Slice(prKeys, func(i, j int) bool {
-// 		ni, nj := prKeys[i].Name, prKeys[j].Name
-// 		if ni == nj {
-// 			return prKeys[i].Type < prKeys[j].Type
-// 		}
-// 		return ni < nj
-// 	})
-
-// 	err := CreateCmexlStore(flags)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	defer cancel()
-// 	cmexlDataMap := make(map[PresetInfoKey]CmexlPresetData, numPrs)
-// 	var cmexlPresetLock sync.Mutex
-
-// 	for _, key := range prKeys {
-// 		v := cmexlDataMap[key]
-// 		errFilename := fmt.Sprintf(".cmexl/stderr/%s.log", key.Name)
-// 		errFile, err := os.Create(errFilename)
-// 		if err != nil {
-// 			v.Errors = append(v.Errors,
-// 				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
-// 		}
-// 		v.StderrLog = errFile
-// 		defer errFile.Close()
-
-// 		outFilename := fmt.Sprintf(".cmexl/%s.log", key.Name)
-// 		outFile, err := os.Create(outFilename)
-// 		if err != nil {
-// 			v.Errors = append(v.Errors,
-// 				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
-// 		}
-// 		v.StdoutLog = outFile
-// 		defer outFile.Close()
-
-// 		if *flags.SaveEvents {
-// 			eventFilename := fmt.Sprintf(".cmexl/events/%s.log", key.Name)
-// 			eventFile, err := os.Create(eventFilename)
-// 			if err != nil {
-// 				v.Errors = append(v.Errors,
-// 					fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
-// 			}
-// 			v.EventsLog = eventFile
-// 			defer eventFile.Close()
-// 		}
-// 		cmexlDataMap[key] = v
-// 		err := startSerialCMakeCommand(ctx, eventsCh, key, &cmexlPresetLock, cmexlDataMap, flags)
-// 		if err != nil {
-// 			v.Errors = append(v.Errors,
-// 				fmt.Errorf("{%s, %s}: %w", key.Name, key.Type.String(), err))
-// 		}
-// 	}
-// }
 
 func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetMap_t, flags ScheduleFlags) error {
 	numPrs := len(prKeys)
@@ -407,9 +361,7 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 
 	var cmakeWg sync.WaitGroup
 
-	if *flags.Serial {
-		cmakeWg.Add(1)
-	} else {
+	if !(*flags.Serial) {
 		cmakeWg.Add(numPrs)
 	}
 
@@ -470,10 +422,12 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	// Beyond this point, we should not abruptly halt this parent process since
 	// we want any working preset to at least finish in case of parallel build
 	for _, key := range prKeys {
+		if *flags.Serial {
+			cmakeWg.Add(1)
+		}
 		initErr := startCMakeCommand(ctx, eventsCh, key, &cmakeWg, cmexlDataMap, flags)
 		if *flags.Serial {
 			cmakeWg.Wait()
-			cmakeWg.Add(1)
 		}
 		if initErr != nil {
 			v := cmexlDataMap[key]
@@ -483,10 +437,7 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 		}
 	}
 
-	// event draining
-	if !(*flags.Serial) {
-		cmakeWg.Wait()
-	}
+	cmakeWg.Wait()
 
 	for len(eventsCh) > 0 {
 		ev := <-eventsCh
@@ -496,24 +447,48 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	close(uiDone)
 	uiWg.Wait()
 
-	// TODO: Remove this for projects that dont need vcpkg. Will have to read from viper for this
-	fmt.Println("Packages")
-	fmt.Println("==============")
-	for key, val := range cmexlDataMap {
-		fmt.Printf("(%s, %s): Already installed: %d, Needed removal: %d, Needed installation: %d\n",
-			key.Name, key.Type.String(),
-			val.ExecState.VcpkgAlreadyInstalledCount,
-			val.ExecState.VcpkgNeedRemovedCount,
-			val.ExecState.VcpkgNeedInstalledCount)
+	var usingVcpkg bool
+	err = loadCmexlConf()
+	if err != nil {
+		usingVcpkg = false
+	} else {
+		var C Config
+		if err := viper.Unmarshal(&C); err != nil {
+			return fmt.Errorf("unmarshal: %w", err)
+		}
+		usingVcpkg = C.InitSettings.UseVcpkg
 	}
 
+	if usingVcpkg {
+		fmt.Println("Packages")
+		fmt.Println("==============")
+		for key, val := range cmexlDataMap {
+			fmt.Printf("(%s, %s): Already installed: %d, Needed removal: %d, Needed installation: %d\n",
+				key.Name, key.Type.String(),
+				val.ExecState.VcpkgAlreadyInstalledCount,
+				val.ExecState.VcpkgNeedRemovedCount,
+				val.ExecState.VcpkgNeedInstalledCount)
+		}
+	}
 	fmt.Println("Error Report")
 	fmt.Println("==============")
+	total := len(cmexlDataMap)
+	withErrs := 0
 
-	for prKey, data := range cmexlDataMap {
+	for _, data := range cmexlDataMap {
 		if len(data.Errors) > 0 {
-			printKnownErrors(prKey)
+			withErrs++
 		}
+	}
+	if withErrs > 0 {
+		color.Red("presets with errors: %d / %d\n", withErrs, total)
+		for prKey, data := range cmexlDataMap {
+			if len(data.Errors) > 0 {
+				printKnownErrors(prKey)
+			}
+		}
+	} else {
+		fmt.Printf("no errors")
 	}
 	return nil
 }

@@ -9,43 +9,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	cmexlConfigFileName = "cmexlconf"
-	cmexlConfigFileType = "json"
-)
-
-type Config struct {
-	InitSettings InitSettings `mapstructure:"init_settings"`
-	Tasks        []Task       `mapstructure:"tasks"`
-}
-
-type InitSettings struct {
-	Name     string `mapstructure:"name"`
-	Sname    string `mapstructure:"sname"`
-	Lname    string `mapstructure:"lname"`
-	Uname    string `mapstructure:"uname"`
-	UseVcpkg bool   `mapstructure:"use_vcpkg"`
-}
-
-type Task struct {
-	Name      string   `mapstructure:"name"`
-	Workflows []string `mapstructure:"workflows"`
-}
-
-func findCmexlConf(cmd *cobra.Command, args []string) error {
-	viper.AddConfigPath(".")
-	viper.AddConfigPath(".cmexl/")
-	viper.SetConfigName(cmexlConfigFileName)
-	viper.SetConfigType(cmexlConfigFileType)
-	err := viper.ReadInConfig()
-	return err
-}
-
 func schedGroupE(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New("can only accept 1 task")
 	}
-	var C Config
+	var C cmutils.Config
 	if err := viper.Unmarshal(&C); err != nil {
 		return fmt.Errorf("unmarshal: %w", err)
 	}
@@ -62,7 +30,7 @@ func schedGroupE(cmd *cobra.Command, args []string) error {
 var schedTaskCmd = &cobra.Command{
 	Use:               "task <task-name>",
 	Short:             "schedule cmexl task for execution",
-	PersistentPreRunE: findCmexlConf,
+	PersistentPreRunE: cmutils.FindCmexlConf,
 	RunE:              schedGroupE,
 	Args:              cobra.ExactArgs(1),
 }

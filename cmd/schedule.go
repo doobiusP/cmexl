@@ -56,6 +56,5 @@ func init() {
 	rootCmd.AddCommand(scheduleCmd)
 	scheduleCmd.Flags().StringP("type", "t", "", "Type of preset being passed in. Should be one of the cmake preset types.")
 	flags.SaveEvents = scheduleCmd.PersistentFlags().Bool("save-events", false, "Save events picked up by cmexl under .cmexl/events/{presetName}.log")
-	flags.Refresh = scheduleCmd.PersistentFlags().Bool("refresh", false, "Rebuild binary directory from scratch")
 	flags.Serial = scheduleCmd.PersistentFlags().BoolP("serial", "s", false, "Force serial ordering of preset execution")
 }

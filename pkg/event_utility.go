@@ -6,6 +6,9 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -25,9 +28,33 @@ var (
 	VcpkgFailedRegex  = regexp.MustCompile(`Running vcpkg install - failed`)
 	VcpkgSuccessRegex = regexp.MustCompile(`Running vcpkg install - done`)
 
-	StderrFileRegex       = regexp.MustCompile(`(?i)\berror\b|\bfail\b`)
+	errLogRegex           = regexp.MustCompile(`(?i)(error|fail)`)
 	VcpkgManifestLogRegex = regexp.MustCompile(`(?P<manifest_log>\S*vcpkg-manifest-install\.log)`)
 )
+
+const (
+	CmexlConfigFileName = "cmexlconf"
+	CmexlConfigFileType = "json"
+)
+
+type Config struct {
+	InitSettings InitSettings `mapstructure:"init_settings"`
+	Tasks        []Task       `mapstructure:"tasks"`
+}
+
+type InitSettings struct {
+	Name     string `mapstructure:"name"`
+	Sname    string `mapstructure:"sname"`
+	Lname    string `mapstructure:"lname"`
+	Uname    string `mapstructure:"uname"`
+	UseVcpkg bool   `mapstructure:"use_vcpkg"`
+	Template string `mapstructure:"template"`
+}
+
+type Task struct {
+	Name      string   `mapstructure:"name"`
+	Workflows []string `mapstructure:"workflows"`
+}
 
 type CmexlEvent_t int
 
@@ -364,4 +391,16 @@ func TrySend(events chan<- CmexlEvent, event CmexlEvent) {
 	default:
 		return
 	}
+}
+
+func FindCmexlConf(cmd *cobra.Command, args []string) error {
+	return loadCmexlConf()
+}
+
+func loadCmexlConf() error {
+	viper.AddConfigPath(".")
+	viper.AddConfigPath(".cmexl/")
+	viper.SetConfigFile("cmexlconf.json")
+	err := viper.ReadInConfig()
+	return err
 }

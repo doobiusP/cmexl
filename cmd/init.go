@@ -51,6 +51,7 @@ func defaultTemplateCopy(templateDir string, destRoot string, bootData *template
 	warningColor := color.New(color.FgYellow)
 
 	processTemplate := func(path string, d fs.DirEntry, err error) error {
+		fmt.Printf("Looking at %s\n", path)
 		if err != nil {
 			return err
 		}
@@ -86,7 +87,7 @@ func defaultTemplateCopy(templateDir string, destRoot string, bootData *template
 				return err
 			}
 
-			var contentTmpl = template.Must(template.New("").Parse(string(srcBytes)))
+			var contentTmpl = template.Must(template.New("").Delims("||", "||").Parse(string(srcBytes)))
 			var finalBuf bytes.Buffer
 			if err := contentTmpl.Execute(&finalBuf, bootData); err != nil {
 				return err

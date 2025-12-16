@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "||.LName||",
+  "description": "||.Name|| short description",
+  "default-features": ["core-lib", "math", "tests"],
+  "features": {
+    "core-lib": {
+      "description": "Dependencies for core component",
+      "dependencies": [
+        "zlib"
+      ]
+    },
+    "math": {
+      "description": "Dependencies for math component",
+      "dependencies": [
+        "zlib" 
+      ]
+    },
+    "tests": {
+      "description": "Build ||.LName|| tests option",
+      "dependencies": [
+        {
+          "name": "boost-test",
+          "version>=": "1.88.0"
+        },
+        "zlib"
+      ]
+    }
+  }
+}
