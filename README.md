@@ -21,7 +21,7 @@ It provides the following capabilities:
 ### Prerequisites
 
 You will need
-* Go (1.16+)
+* Go (1.24+)
 * CMake (3.31+)
 * vcpkg
 
