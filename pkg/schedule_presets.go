@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -447,28 +446,14 @@ func ScheduleCmakePresets(prType Preset_t, prKeys []PresetInfoKey, prMap PresetM
 	close(uiDone)
 	uiWg.Wait()
 
-	var usingVcpkg bool
-	err = loadCmexlConf()
-	if err != nil {
-		usingVcpkg = false
-	} else {
-		var C Config
-		if err := viper.Unmarshal(&C); err != nil {
-			return fmt.Errorf("unmarshal: %w", err)
-		}
-		usingVcpkg = C.InitSettings.UseVcpkg
-	}
-
-	if usingVcpkg {
-		fmt.Println("Packages")
-		fmt.Println("==============")
-		for key, val := range cmexlDataMap {
-			fmt.Printf("(%s, %s): Already installed: %d, Needed removal: %d, Needed installation: %d\n",
-				key.Name, key.Type.String(),
-				val.ExecState.VcpkgAlreadyInstalledCount,
-				val.ExecState.VcpkgNeedRemovedCount,
-				val.ExecState.VcpkgNeedInstalledCount)
-		}
+	fmt.Println("Packages")
+	fmt.Println("==============")
+	for key, val := range cmexlDataMap {
+		fmt.Printf("(%s, %s): Already installed: %d, Needed removal: %d, Needed installation: %d\n",
+			key.Name, key.Type.String(),
+			val.ExecState.VcpkgAlreadyInstalledCount,
+			val.ExecState.VcpkgNeedRemovedCount,
+			val.ExecState.VcpkgNeedInstalledCount)
 	}
 	fmt.Println("Error Report")
 	fmt.Println("==============")

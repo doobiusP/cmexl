@@ -15,14 +15,10 @@ import (
 )
 
 type templateData struct {
-	UseVcpkg bool
-
 	Name  string
 	SName string
 	UName string
 	LName string
-
-	Version string
 }
 
 func dirExists(dir string) (bool, error) {
@@ -147,10 +143,6 @@ func copyTemplates(templatesToCopy []string, bootData *templateData) error {
 }
 
 func initE(cmd *cobra.Command, args []string) error {
-	noVcpkg, noVcpkgErr := cmd.PersistentFlags().GetBool("no-vcpkg")
-	if noVcpkgErr != nil {
-		return noVcpkgErr
-	}
 	name, nameErr := cmd.PersistentFlags().GetString("name")
 	if nameErr != nil {
 		return nameErr
@@ -178,19 +170,6 @@ func initE(cmd *cobra.Command, args []string) error {
 
 	templatesToCopy := []string{templateDir}
 
-	if !noVcpkg {
-		vcpkgDir := filepath.Join(execDir, "templates", "vcpkg_common")
-		exists, err = dirExists(vcpkgDir)
-
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return errors.New("vcpkg_common provided not found in cmexl/templates")
-		}
-		templatesToCopy = append(templatesToCopy, vcpkgDir)
-	}
-
 	sname, snameErr := cmd.PersistentFlags().GetString("short-name")
 	if snameErr != nil {
 		return snameErr
@@ -207,12 +186,10 @@ func initE(cmd *cobra.Command, args []string) error {
 	}
 
 	bootData := templateData{
-		UseVcpkg: !noVcpkg,
-		Name:     name,
-		SName:    sname,
-		UName:    strings.ToUpper(sname),
-		LName:    strings.ToLower(sname),
-		Version:  "0.1.0.0",
+		Name:  name,
+		SName: sname,
+		UName: strings.ToUpper(sname),
+		LName: strings.ToLower(sname),
 	}
 
 	err = copyTemplates(templatesToCopy, &bootData)
@@ -235,9 +212,5 @@ func init() {
 	initCmd.PersistentFlags().String("template", "", "Template to bootstrap project with. Required")
 	initCmd.MarkPersistentFlagRequired("template")
 
-	initCmd.PersistentFlags().Bool("no-vcpkg", false, "Omit vcpkg details. Default false")
 	initCmd.PersistentFlags().String("short-name", "", "Short name of project used in generated files. Default <name>")
-
-	// TODO: omit version handling flag maybe?
-	// TODO: specify, add, delete configs.
 }

@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Project Configuration Schema",
+  "type": "object",
+  "required": ["init_settings", "tasks"],
+  "properties": {
+    "init_settings": {
+      "type": "object",
+      "description": "Initial configuration settings for the template engine.",
+      "required": ["name", "sname", "lname", "uname", "template"],
+      "properties": {
+        "name": { "type": "string" },
+        "sname": { "type": "string" },
+        "lname": { "type": "string" },
+        "uname": { "type": "string" },
+        "template": { "type": "string" }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "description": "List of platform-specific build tasks and workflows.",
+      "items": {
+        "type": "object",
+        "required": ["name", "workflows"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The target platform (e.g., win, linux)."
+          },
+          "workflows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A list of build configurations associated with the task."
+          }
+        }
+      }
+    }
+  }
+}
