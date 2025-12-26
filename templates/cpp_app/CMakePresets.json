@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+  "version": 10,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 18,
+    "patch": 0
+  },
+  "$comment": [
+    "You will need CMake version 3.31 or higher in order to use this CMakePresets.json.",
+    "For lesser cmake versions, just manually list the variables below into the command line invocation of cmake.",
+    "Feel free to edit"
+  ],
+  "include": [
+    "presets/clang.json",
+    "presets/clangcl.json",
+    "presets/gcc.json",
+    "presets/mingw.json",
+    "presets/msvc.json"
+  ]
+}

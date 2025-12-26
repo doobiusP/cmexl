@@ -1,0 +1,108 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 18,
+        "patch": 0
+    },
+    "include": [
+        "linux_base.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "clang-dev",
+            "displayName": "x64 Clang",
+            "inherits": "lbase",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NTEST_BUILD_TESTS": "ON",
+                "VCPKG_TARGET_TRIPLET": "x64-clang-static-dyn-rt",
+                "CMAKE_CXX_FLAGS_INIT": "-fno-omit-frame-pointer --coverage -Wall -Wextra -Wpedantic -Werror -Qunused-arguments",
+                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-clang.cmake"
+            }
+        },
+        {
+            "name": "clang-rel",
+            "displayName": "x64 Clang Rel",
+            "inherits": "lbase",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NTEST_BUILD_TESTS": "ON",
+                "VCPKG_TARGET_TRIPLET": "x64-clang-static-dyn-rt",
+                "CMAKE_CXX_FLAGS_INIT": "-fno-omit-frame-pointer --coverage -Wall -Wextra -Wpedantic -Werror -Qunused-arguments",
+                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-clang.cmake"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "clang-dev",
+            "displayName": "x64 Clang",
+            "jobs": 4,
+            "configurePreset": "clang-dev"
+        },
+        {
+            "name": "clang-rel",
+            "displayName": "x64 Clang Rel",
+            "jobs": 4,
+            "configurePreset": "clang-rel"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "clang-dev",
+            "displayName": "x64 Clang",
+            "configurePreset": "clang-dev",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "clang-rel",
+            "displayName": "x64 Clang Rel",
+            "configurePreset": "clang-rel",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "clang-dev",
+            "displayName": "x64 Clang",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang-dev"
+                },
+                {
+                    "type": "build",
+                    "name": "clang-dev"
+                },
+                {
+                    "type": "test",
+                    "name": "clang-dev"
+                }
+            ]
+        },
+        {
+            "name": "clang-rel",
+            "displayName": "x64 Clang Rel",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang-rel"
+                },
+                {
+                    "type": "build",
+                    "name": "clang-rel"
+                },
+                {
+                    "type": "test",
+                    "name": "clang-rel"
+                }
+            ]
+        }
+    ]
+}

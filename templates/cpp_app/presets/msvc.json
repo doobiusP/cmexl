@@ -1,0 +1,98 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 18,
+        "patch": 0
+    },
+    "include": [
+        "win_base.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "win",
+            "displayName": "x64 Win",
+            "inherits": "wbase",
+            "cacheVariables": {
+                "CMAKE_GENERATOR_PLATFORM": "x64",
+                "NTEST_BUILD_TESTS": "ON",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "win-dev",
+            "displayName": "x64 Win",
+            "jobs": 4,
+            "configurePreset": "win",
+            "configuration": "Debug"
+        },
+        {
+            "name": "win-rel",
+            "displayName": "x64 Win Rel",
+            "jobs": 4,
+            "configurePreset": "win",
+            "configuration": "Release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "win-dev",
+            "displayName": "x64 Win",
+            "configurePreset": "win",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "win-rel",
+            "displayName": "x64 Win Rel",
+            "configurePreset": "win",
+            "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "win-dev",
+            "displayName": "x64 Win",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "win"
+                },
+                {
+                    "type": "build",
+                    "name": "win-dev"
+                },
+                {
+                    "type": "test",
+                    "name": "win-dev"
+                }
+            ]
+        },
+        {
+            "name": "win-rel",
+            "displayName": "x64 Win Rel",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "win"
+                },
+                {
+                    "type": "build",
+                    "name": "win-rel"
+                },
+                {
+                    "type": "test",
+                    "name": "win-rel"
+                }
+            ]
+        }
+    ]
+}

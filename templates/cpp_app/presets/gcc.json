@@ -1,0 +1,104 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 18,
+        "patch": 0
+    },
+    "include": [
+        "linux_base.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "gcc-dev",
+            "displayName": "x64 GCC",
+            "inherits": "lbase",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NTEST_BUILD_TESTS": "ON",
+                "VCPKG_TARGET_TRIPLET": "x64-linux"
+            }
+        },
+        {
+            "name": "gcc-rel",
+            "displayName": "x64 GCC Rel",
+            "inherits": "lbase",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NTEST_BUILD_TESTS": "ON",
+                "VCPKG_TARGET_TRIPLET": "x64-linux"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "gcc-dev",
+            "displayName": "x64 GCC",
+            "jobs": 4,
+            "configurePreset": "gcc-dev"
+        },
+        {
+            "name": "gcc-rel",
+            "displayName": "x64 GCC Rel",
+            "jobs": 4,
+            "configurePreset": "gcc-rel"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "gcc-dev",
+            "displayName": "x64 GCC",
+            "configurePreset": "gcc-dev",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "gcc-rel",
+            "displayName": "x64 GCC Rel",
+            "configurePreset": "gcc-rel",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "gcc-dev",
+            "displayName": "x64 GCC",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc-dev"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc-dev"
+                },
+                {
+                    "type": "test",
+                    "name": "gcc-dev"
+                }
+            ]
+        },
+        {
+            "name": "gcc-rel",
+            "displayName": "x64 GCC Rel",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc-rel"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc-rel"
+                },
+                {
+                    "type": "test",
+                    "name": "gcc-rel"
+                }
+            ]
+        }
+    ]
+}

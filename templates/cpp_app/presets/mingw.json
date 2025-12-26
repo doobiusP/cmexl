@@ -1,0 +1,120 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 18,
+        "patch": 0
+    },
+    "include": [
+        "linux_base.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "mingw-base",
+            "hidden": true,
+            "inherits": "lbase",
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x64-mingw-static-dyn-rt",
+                "CMAKE_CXX_FLAGS_INIT": "-fno-omit-frame-pointer -fprofile-arcs -ftest-coverage -Wall -Wextra -Wpedantic -Werror",
+                "CMAKE_CXX_FLAGS_DEBUG_INIT": "-ggdb",
+                "CMAKE_EXE_LINKER_FLAGS_INIT": "-fprofile-arcs -ftest-coverage",
+                "CMAKE_SHARED_LINKER_FLAGS_INIT": "-fprofile-arcs -ftest-coverage",
+                "CMAKE_MODULE_LINKER_FLAGS_INIT": "-fprofile-arcs -ftest-coverage",
+                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-mingw.cmake"
+            }
+        },
+        {
+            "name": "mingw-dev",
+            "displayName": "x64 MinGW",
+            "inherits": [
+                "mingw-base"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NTEST_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "mingw-rel",
+            "displayName": "x64 MinGW Rel",
+            "inherits": [
+                "mingw-base"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NTEST_BUILD_TESTS": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "mingw-dev",
+            "displayName": "x64 MinGW",
+            "jobs": 4,
+            "configurePreset": "mingw-dev"
+        },
+        {
+            "name": "mingw-rel",
+            "displayName": "x64 MinGW Rel",
+            "jobs": 4,
+            "configurePreset": "mingw-rel"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "mingw-dev",
+            "displayName": "x64 MinGW",
+            "configurePreset": "mingw-dev",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "mingw-rel",
+            "displayName": "x64 MinGW Rel",
+            "configurePreset": "mingw-rel",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "mingw-dev",
+            "displayName": "x64 MinGW",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "mingw-dev"
+                },
+                {
+                    "type": "build",
+                    "name": "mingw-dev"
+                },
+                {
+                    "type": "test",
+                    "name": "mingw-dev"
+                }
+            ]
+        },
+        {
+            "name": "mingw-rel",
+            "displayName": "x64 MinGW Rel",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "mingw-rel"
+                },
+                {
+                    "type": "build",
+                    "name": "mingw-rel"
+                },
+                {
+                    "type": "test",
+                    "name": "mingw-rel"
+                }
+            ]
+        }
+    ]
+}

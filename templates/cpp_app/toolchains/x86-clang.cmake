@@ -1,0 +1,9 @@
+set(CMAKE_C_FLAGS -m32)
+set(CMAKE_CXX_FLAGS -m32)
+set(CMAKE_EXE_LINKER_FLAGS -m32)
+set(CMAKE_SHARED_LINKER_FLAGS -m32)
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_CXX_COMPILER clang++)
+set(CMAKE_CXX_COMPILER_TARGET x86_64-pc-linux-gnu)
+
+include("$ENV{VCPKG_ROOT}/scripts/toolchains/linux.cmake")

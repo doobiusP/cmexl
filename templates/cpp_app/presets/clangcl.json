@@ -1,0 +1,99 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 18,
+        "patch": 0
+    },
+    "include": [
+        "win_base.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "clangcl",
+            "displayName": "x64 ClangCL",
+            "inherits": "wbase",
+            "cacheVariables": {
+                "CMAKE_GENERATOR_PLATFORM": "x64",
+                "CMAKE_GENERATOR_TOOLSET": "ClangCL",
+                "NTEST_BUILD_TESTS": "ON",
+                "VCPKG_TARGET_TRIPLET": "x64-win-llvm-static-md"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "clangcl-dev",
+            "displayName": "x64 ClangCL",
+            "jobs": 4,
+            "configurePreset": "clangcl",
+            "configuration": "Debug"
+        },
+        {
+            "name": "clangcl-rel",
+            "displayName": "x64 ClangCL Rel",
+            "jobs": 4,
+            "configurePreset": "clangcl",
+            "configuration": "Release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "clangcl-dev",
+            "displayName": "x64 ClangCL",
+            "configurePreset": "clangcl",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "clangcl-rel",
+            "displayName": "x64 ClangCL Rel",
+            "configurePreset": "clangcl",
+            "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "clangcl-dev",
+            "displayName": "x64 ClangCL",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clangcl"
+                },
+                {
+                    "type": "build",
+                    "name": "clangcl-dev"
+                },
+                {
+                    "type": "test",
+                    "name": "clangcl-dev"
+                }
+            ]
+        },
+        {
+            "name": "clangcl-rel",
+            "displayName": "x64 ClangCL Rel",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clangcl"
+                },
+                {
+                    "type": "build",
+                    "name": "clangcl-rel"
+                },
+                {
+                    "type": "test",
+                    "name": "clangcl-rel"
+                }
+            ]
+        }
+    ]
+}

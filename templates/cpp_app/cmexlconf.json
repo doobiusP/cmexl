@@ -1,0 +1,32 @@
+{
+    "$schema": "https://raw.githubusercontent.com/doobiusP/cmexl/master/cmexlconf_schema.json",
+    "init_settings": {
+        "name": "||.Name||",
+        "sname": "||.SName||",
+        "lname": "||.LName||",
+        "uname": "||.UName||",
+        "template": "cpp_app"
+    },
+    "tasks": [
+        {
+            "name": "linux",
+            "workflows": [
+                "clang-dev",
+                "mingw-dev",
+                "gcc-dev",
+                "clang-rel",
+                "mingw-rel",
+                "gcc-rel"
+            ]
+        },
+        {
+            "name": "win",
+            "workflows": [
+                "win-dev",
+                "clangcl-dev",
+                "win-rel",
+                "clangcl-rel"
+            ]
+        }
+    ]
+}

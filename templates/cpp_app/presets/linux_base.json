@@ -1,0 +1,38 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+    "version": 10,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 18,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "lbase",
+            "hidden": true,
+            "warnings": {
+                "dev": true
+            },
+            "generator": "Ninja",
+            "environment": {
+                "VCPKG_ROOT": "$penv{VCPKG_ROOT}"
+            },
+            "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "cacheVariables": {
+                "BUILD_SHARED_LIBS": true,
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+                "VCPKG_INSTALLED_DIR": "vcpkg_installed/${presetName}/vcpkg_installed",
+                "CMAKE_MESSAGE_LOG_LEVEL": "VERBOSE",
+                "CMAKE_CXX_FLAGS_INIT": "-fno-omit-frame-pointer --coverage -Wall -Wextra -Wpedantic -Werror",
+                "CMAKE_CXX_FLAGS_DEBUG_INIT": "-ggdb -pg",
+                "CMAKE_CXX_FLAGS_RELEASE_INIT": "-O3 -ffast-math",
+                "CMAKE_EXE_LINKER_FLAGS_INIT": "-rdynamic --coverage",
+                "CMAKE_SHARED_LINKER_FLAGS_INIT": "--coverage",
+                "CMAKE_MODULE_LINKER_FLAGS_INIT": "--coverage",
+                "CMAKE_STATIC_LINKER_FLAGS_INIT": ""
+            }
+        }
+    ]
+}
