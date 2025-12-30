@@ -11,47 +11,79 @@
     ],
     "configurePresets": [
         {
-            "name": "win",
-            "displayName": "x64 Win",
+            "name": "msvc",
+            "displayName": "x64 MSVC",
             "inherits": "wbase",
             "cacheVariables": {
                 "CMAKE_GENERATOR_PLATFORM": "x64",
-                "NTEST_BUILD_TESTS": "ON",
-                "VCPKG_TARGET_TRIPLET": "x64-windows"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS": "/W4 /WX /permissive- /MP",
+                "||.UName||_C_FLAGS": "/W4 /WX /permissive- /MP",
+                "||.UName||_EXE_LINKER_FLAGS": "/WX",
+                "||.UName||_SHARED_LINKER_FLAGS": "/WX",
+                "||.UName||_CXX_FLAGS_DEBUG": "/Od /Oy- /RTC1",
+                "||.UName||_C_FLAGS_DEBUG": "/Od /Oy- /RTC1",
+                "||.UName||_CXX_FLAGS_RELEASE": "/fp:fast",
+                "||.UName||_C_FLAGS_RELEASE": "/fp:fast",
+                "||.UName||_EXE_LINKER_FLAGS_DEBUG": "/DEBUG:FULL",
+                "||.UName||_SHARED_LINKER_FLAGS_DEBUG": "/DEBUG:FULL",
+                "||.UName||_CXX_FLAGS_PROFILE": "/Oy-",
+                "||.UName||_C_FLAGS_PROFILE": "/Oy-",
+                "||.UName||_EXE_LINKER_FLAGS_PROFILE": "/DEBUG:FULL",
+                "||.UName||_SHARED_LINKER_FLAGS_PROFILE": "/DEBUG:FULL"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "win-dev",
-            "displayName": "x64 Win",
+            "name": "msvc-dev",
+            "displayName": "x64 MSVC",
             "jobs": 4,
-            "configurePreset": "win",
-            "configuration": "Debug"
+            "configurePreset": "msvc",
+            "configuration": "Debug",
+            "verbose": true
         },
         {
-            "name": "win-rel",
-            "displayName": "x64 Win Rel",
+            "name": "msvc-rel",
+            "displayName": "x64 MSVC Rel",
             "jobs": 4,
-            "configurePreset": "win",
-            "configuration": "Release"
+            "configurePreset": "msvc",
+            "configuration": "Release",
+            "verbose": true
+        },
+        {
+            "name": "msvc-prof",
+            "displayName": "x64 MSVC Prof",
+            "jobs": 4,
+            "configurePreset": "msvc",
+            "configuration": "Profile",
+            "verbose": true
         }
     ],
     "testPresets": [
         {
-            "name": "win-dev",
-            "displayName": "x64 Win",
-            "configurePreset": "win",
+            "name": "msvc-dev",
+            "displayName": "x64 MSVC",
+            "configurePreset": "msvc",
             "configuration": "Debug",
             "output": {
                 "outputOnFailure": true
             }
         },
         {
-            "name": "win-rel",
-            "displayName": "x64 Win Rel",
-            "configurePreset": "win",
+            "name": "msvc-rel",
+            "displayName": "x64 MSVC Rel",
+            "configurePreset": "msvc",
             "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "msvc-prof",
+            "displayName": "x64 MSVC Prof",
+            "configurePreset": "msvc",
+            "configuration": "Profile",
             "output": {
                 "outputOnFailure": true
             }
@@ -59,38 +91,56 @@
     ],
     "workflowPresets": [
         {
-            "name": "win-dev",
-            "displayName": "x64 Win",
+            "name": "msvc-dev",
+            "displayName": "x64 MSVC",
             "steps": [
                 {
                     "type": "configure",
-                    "name": "win"
+                    "name": "msvc"
                 },
                 {
                     "type": "build",
-                    "name": "win-dev"
+                    "name": "msvc-dev"
                 },
                 {
                     "type": "test",
-                    "name": "win-dev"
+                    "name": "msvc-dev"
                 }
             ]
         },
         {
-            "name": "win-rel",
-            "displayName": "x64 Win Rel",
+            "name": "msvc-rel",
+            "displayName": "x64 MSVC Rel",
             "steps": [
                 {
                     "type": "configure",
-                    "name": "win"
+                    "name": "msvc"
                 },
                 {
                     "type": "build",
-                    "name": "win-rel"
+                    "name": "msvc-rel"
                 },
                 {
                     "type": "test",
-                    "name": "win-rel"
+                    "name": "msvc-rel"
+                }
+            ]
+        },
+        {
+            "name": "msvc-prof",
+            "displayName": "x64 MSVC Prof",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "msvc"
+                },
+                {
+                    "type": "build",
+                    "name": "msvc-prof"
+                },
+                {
+                    "type": "test",
+                    "name": "msvc-prof"
                 }
             ]
         }

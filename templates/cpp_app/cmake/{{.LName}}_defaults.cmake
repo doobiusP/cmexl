@@ -1,5 +1,10 @@
 include(GenerateExportHeader)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
+
 function(copy_mingw64_dependency PATH_TO_DEP NAME_OF_DEP)
     execute_process(
         COMMAND
@@ -14,35 +19,110 @@ function(copy_mingw64_dependency PATH_TO_DEP NAME_OF_DEP)
     message(VERBOSE "[||.UName||][MINGW64] Found ${NAME_OF_DEP} at ${_PATH_TO_DEP}")
     set(${PATH_TO_DEP} ${_PATH_TO_DEP} PARENT_SCOPE)
 
-    # Uncomment the below lines if you have write access to the binary directory, otherwise manually copy
-    # configure_file(${_PATH_TO_DEP} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${NAME_OF_DEP} COPYONLY)
-    # message(VERBOSE "[NTEST2][MINGW64] Finished copying over ${NAME_OF_DEP} to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}...")
+    # Comment out the below lines if you don't have write access to the binary directory; manually copy in that case
+    configure_file(${_PATH_TO_DEP} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${NAME_OF_DEP} COPYONLY)
+    message(VERBOSE "[||.UName||][MINGW64] Finished copying over ${NAME_OF_DEP} to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}...")
 endfunction()
 
-set(NTEST2_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
-set(NTEST2_TOP_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+add_library(||.LName||_build_intf INTERFACE)
+add_library(||.SName||::build ALIAS ||.LName||_build_intf)
+
+target_include_directories(
+    ||.LName||_build_intf
+    INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
+target_compile_definitions(
+    ||.LName||_build_intf
+    INTERFACE
+    ||.UName||_CONFIG_$<UPPER_CASE:$<CONFIG>>
+)
+
+set(FLAG_VARIATIONS "CXX_FLAGS;C_FLAGS;EXE_LINKER_FLAGS;SHARED_LINKER_FLAGS;MODULE_LINKER_FLAGS;STATIC_LINKER_FLAGS")
+foreach(FVAR IN LISTS FLAG_VARIATIONS)
+    foreach(CVAR IN LISTS ALLOWED_BUILD_TYPES)
+        string(TOUPPER "${CVAR}" UPPER_CVAR)
+        set(BASE_VAL "${||.UName||_${FVAR}}")
+        set(CONFIG_VAL "${||.UName||_${FVAR}_${UPPER_CVAR}}")
+        set(COMBINED_FLAGS "${BASE_VAL} ${CONFIG_VAL}")
+        string(REPLACE " " ";" PROJBASE_${FVAR}_${UPPER_CVAR} "${COMBINED_FLAGS}")
+        list(REMOVE_ITEM PROJBASE_${FVAR}_${UPPER_CVAR} "")
+        _mmsg("PROJBASE_${FVAR}_${UPPER_CVAR} = ${PROJBASE_${FVAR}_${UPPER_CVAR}}")
+    endforeach()
+endforeach()
+
+target_compile_options(
+    ||.LName||_build_intf
+    INTERFACE
+    $<$<CONFIG:Debug>:
+    $<$<COMPILE_LANGUAGE:CXX>:${PROJBASE_CXX_FLAGS_DEBUG}>
+    $<$<COMPILE_LANGUAGE:C>:${PROJBASE_C_FLAGS_DEBUG}>
+    >
+    $<$<CONFIG:Release>:
+    $<$<COMPILE_LANGUAGE:CXX>:${PROJBASE_CXX_FLAGS_RELEASE}>
+    $<$<COMPILE_LANGUAGE:C>:${PROJBASE_C_FLAGS_RELEASE}>
+    >
+    $<$<CONFIG:RelWithDebInfo>:
+    $<$<COMPILE_LANGUAGE:CXX>:${PROJBASE_CXX_FLAGS_RELWITHDEBINFO}>
+    $<$<COMPILE_LANGUAGE:C>:${PROJBASE_C_FLAGS_RELWITHDEBINFO}>
+    >
+    $<$<CONFIG:MinSizeRel>:
+    $<$<COMPILE_LANGUAGE:CXX>:${PROJBASE_CXX_FLAGS_MINSIZEREL}>
+    $<$<COMPILE_LANGUAGE:C>:${PROJBASE_C_FLAGS_MINSIZEREL}>
+    >
+    $<$<CONFIG:Profile>:
+    $<$<COMPILE_LANGUAGE:CXX>:${PROJBASE_CXX_FLAGS_PROFILE}>
+    $<$<COMPILE_LANGUAGE:C>:${PROJBASE_C_FLAGS_PROFILE}>
+    >
+)
+
+target_link_options(
+    ||.LName||_build_intf
+    INTERFACE
+    $<$<CONFIG:Debug>:
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${PROJBASE_EXE_LINKER_FLAGS_DEBUG}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:${PROJBASE_SHARED_LINKER_FLAGS_DEBUG}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>:${PROJBASE_MODULE_LINKER_FLAGS_DEBUG}>
+    >
+    $<$<CONFIG:Release>:
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${PROJBASE_EXE_LINKER_FLAGS_RELEASE}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:${PROJBASE_SHARED_LINKER_FLAGS_RELEASE}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>:${PROJBASE_MODULE_LINKER_FLAGS_RELEASE}>
+    >
+    $<$<CONFIG:RelWithDebInfo>:
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${PROJBASE_EXE_LINKER_FLAGS_RELWITHDEBINFO}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:${PROJBASE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>:${PROJBASE_MODULE_LINKER_FLAGS_RELWITHDEBINFO}>
+    >
+    $<$<CONFIG:MinSizeRel>:
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${PROJBASE_EXE_LINKER_FLAGS_MINSIZEREL}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:${PROJBASE_SHARED_LINKER_FLAGS_MINSIZEREL}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>:${PROJBASE_MODULE_LINKER_FLAGS_MINSIZEREL}>
+    >
+    $<$<CONFIG:Profile>:
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${PROJBASE_EXE_LINKER_FLAGS_PROFILE}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:${PROJBASE_SHARED_LINKER_FLAGS_PROFILE}>
+    $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>:${PROJBASE_MODULE_LINKER_FLAGS_PROFILE}>
+    >
+)
+
 macro(add_standards TARGET)
     _mmsg("adding standards for ${TARGET}")
-
     set_target_properties(
-        ${TARGET} 
-        PROPERTIES
-            C_STANDARD 99
-            C_STANDARD_REQUIRED ON
-            C_EXTENSIONS OFF
-            CXX_STANDARD 17
-            CXX_STANDARD_REQUIRED ON
-            CXX_EXTENSIONS OFF
-            POSITION_INDEPENDENT_CODE ON
-            RUNTIME_OUTPUT_DIRECTORY ${NTEST2_TOP_BINARY_DIR}/bin
-            ARCHIVE_OUTPUT_DIRECTORY ${NTEST2_TOP_BINARY_DIR}/lib
-            LIBRARY_OUTPUT_DIRECTORY ${NTEST2_TOP_BINARY_DIR}/bin
-    )
-
-    target_include_directories(
         ${TARGET}
-        PRIVATE
-            $<BUILD_INTERFACE:${NTEST2_INCLUDE_DIR}/src>
+        PROPERTIES
+        C_STANDARD 99
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS OFF
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+    )
+    set_target_properties(
+        ${TARGET}
+        PROPERTIES
+        STATIC_LIBRARY_OPTIONS "$<$<CONFIG:Debug>:${PROJBASE_STATIC_LINKER_FLAGS_DEBUG}>;$<$<CONFIG:Release>:${PROJBASE_STATIC_LINKER_FLAGS_RELEASE}>;$<$<CONFIG:RelWithDebInfo>:${PROJBASE_STATIC_LINKER_FLAGS_RELWITHDEBINFO}>;$<$<CONFIG:MinSizeRel>:${PROJBASE_STATIC_LINKER_FLAGS_MINSIZEREL}>;$<$<CONFIG:Profile>:${PROJBASE_STATIC_LINKER_FLAGS_PROFILE}>"
     )
 endmacro()
 
@@ -50,19 +130,19 @@ macro(add_dll_support TARGET)
     _mmsg("adding dll support for ${TARGET}")
 
     set_target_properties(
-        ${TARGET} 
+        ${TARGET}
         PROPERTIES
-            CXX_VISIBILITY_PRESET hidden
-            VISIBILITY_INLINES_HIDDEN YES
-            IMPORTED_PDB_FILE "${TARGET}.pdb"
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN YES
+        IMPORTED_PDB_FILE "${TARGET}.pdb"
     )
 
-    generate_export_header(${TARGET}) 
+    generate_export_header(${TARGET})
 
     target_include_directories(
         ${TARGET}
-        PUBLIC 
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     )
 endmacro()
 

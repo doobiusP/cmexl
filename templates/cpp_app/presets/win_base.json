@@ -23,13 +23,7 @@
             "cacheVariables": {
                 "BUILD_SHARED_LIBS": true,
                 "VCPKG_INSTALLED_DIR": "vcpkg_installed/${presetName}/vcpkg_installed",
-                "CMAKE_MESSAGE_LOG_LEVEL": "VERBOSE",
-                "CMAKE_CXX_FLAGS_INIT": "/W4 /WX /permissive- /Oy- /MP",
-                "CMAKE_CXX_FLAGS_DEBUG_INIT": "/Zi /Ob0 /Od /RTC1",
-                "CMAKE_EXE_LINKER_FLAGS_INIT": "/DEBUG:FULL /WX /DYNAMICBASE",
-                "CMAKE_SHARED_LINKER_FLAGS_INIT": "/DEBUG:FULL /WX /DYNAMICBASE",
-                "CMAKE_STATIC_LINKER_FLAGS_INIT": "",
-                "CMAKE_MODULE_LINKER_FLAGS_INIT": "/DEBUG:FULL /WX /DYNAMICBASE"
+                "CMAKE_MESSAGE_LOG_LEVEL": "VERBOSE"
             }
         }
     ]

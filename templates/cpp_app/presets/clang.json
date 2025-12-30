@@ -11,27 +11,56 @@
     ],
     "configurePresets": [
         {
+            "name": "clang-base",
+            "inherits": "lbase",
+            "hidden": true,
+            "cacheVariables": {
+                "VCPKG_TARGET_TRIPLET": "x64-clang-static-dyn-rt",
+                "||.UName||_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror",
+                "||.UName||_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror",
+                "||.UName||_EXE_LINKER_FLAGS": "-rdynamic",
+                "||.UName||_SHARED_LINKER_FLAGS": "-rdynamic",
+                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-clang.cmake"
+            }
+        },
+        {
             "name": "clang-dev",
             "displayName": "x64 Clang",
-            "inherits": "lbase",
+            "inherits": "clang-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "NTEST_BUILD_TESTS": "ON",
-                "VCPKG_TARGET_TRIPLET": "x64-clang-static-dyn-rt",
-                "CMAKE_CXX_FLAGS_INIT": "-fno-omit-frame-pointer --coverage -Wall -Wextra -Wpedantic -Werror -Qunused-arguments",
-                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-clang.cmake"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_DEBUG": "-O0 -fcoverage-mcdc -fprofile-instr-generate -fcoverage-mapping --coverage -ggdb3 -fno-omit-frame-pointer",
+                "||.UName||_C_FLAGS_DEBUG": "-O0 -fcoverage-mcdc -fprofile-instr-generate -fcoverage-mapping --coverage -ggdb3 -fno-omit-frame-pointer",
+                "||.UName||_EXE_LINKER_FLAGS_DEBUG": "-fcoverage-mcdc -fprofile-instr-generate -fcoverage-mapping",
+                "||.UName||_SHARED_LINKER_FLAGS_DEBUG": "-fcoverage-mcdc -fprofile-instr-generate -fcoverage-mapping"
             }
         },
         {
             "name": "clang-rel",
             "displayName": "x64 Clang Rel",
-            "inherits": "lbase",
+            "inherits": "clang-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "NTEST_BUILD_TESTS": "ON",
-                "VCPKG_TARGET_TRIPLET": "x64-clang-static-dyn-rt",
-                "CMAKE_CXX_FLAGS_INIT": "-fno-omit-frame-pointer --coverage -Wall -Wextra -Wpedantic -Werror -Qunused-arguments",
-                "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-clang.cmake"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_RELEASE": "-ffast-math -flto",
+                "||.UName||_C_FLAGS_RELEASE": "-ffast-math -flto",
+                "||.UName||_EXE_LINKER_FLAGS_RELEASE": "-flto -s",
+                "||.UName||_SHARED_LINKER_FLAGS_RELEASE": "-flto -s"
+            }
+        },
+        {
+            "name": "clang-prof",
+            "displayName": "x64 Clang Prof",
+            "inherits": "clang-base",
+            "cacheVariables": {
+                "BUILD_SHARED_LIBS": false,
+                "CMAKE_BUILD_TYPE": "Profile",
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_PROFILE": "-fxray-instrument -fxray-instruction-threshold=1 -fprofile-instr-generate -fno-omit-frame-pointer",
+                "||.UName||_C_FLAGS_PROFILE": "-fxray-instrument -fxray-instruction-threshold=1 -fprofile-instr-generate -fno-omit-frame-pointer",
+                "||.UName||_EXE_LINKER_FLAGS_PROFILE": "-fprofile-instr-generate -fxray-instrument",
+                "||.UName||_SHARED_LINKER_FLAGS_PROFILE": "-fprofile-instr-generate -fxray-instrument"
             }
         }
     ],
@@ -40,13 +69,22 @@
             "name": "clang-dev",
             "displayName": "x64 Clang",
             "jobs": 4,
-            "configurePreset": "clang-dev"
+            "configurePreset": "clang-dev",
+            "verbose": true
         },
         {
             "name": "clang-rel",
             "displayName": "x64 Clang Rel",
             "jobs": 4,
-            "configurePreset": "clang-rel"
+            "configurePreset": "clang-rel",
+            "verbose": true
+        },
+        {
+            "name": "clang-prof",
+            "displayName": "x64 Clang Prof",
+            "jobs": 4,
+            "configurePreset": "clang-prof",
+            "verbose": true
         }
     ],
     "testPresets": [
@@ -62,6 +100,14 @@
             "name": "clang-rel",
             "displayName": "x64 Clang Rel",
             "configurePreset": "clang-rel",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "clang-prof",
+            "displayName": "x64 Clang Prof",
+            "configurePreset": "clang-prof",
             "output": {
                 "outputOnFailure": true
             }
@@ -101,6 +147,24 @@
                 {
                     "type": "test",
                     "name": "clang-rel"
+                }
+            ]
+        },
+        {
+            "name": "clang-prof",
+            "displayName": "x64 Clang Prof",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang-prof"
+                },
+                {
+                    "type": "build",
+                    "name": "clang-prof"
+                },
+                {
+                    "type": "test",
+                    "name": "clang-prof"
                 }
             ]
         }

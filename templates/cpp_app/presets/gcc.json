@@ -11,23 +11,55 @@
     ],
     "configurePresets": [
         {
+            "name": "gcc-base",
+            "inherits": "lbase",
+            "hidden": true,
+            "cacheVariables": {
+                "||.UName||_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror",
+                "||.UName||_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror",
+                "||.UName||_EXE_LINKER_FLAGS": "-rdynamic",
+                "||.UName||_SHARED_LINKER_FLAGS": "-rdynamic",
+                "VCPKG_TARGET_TRIPLET": "x64-linux"
+            }
+        },
+        {
             "name": "gcc-dev",
             "displayName": "x64 GCC",
-            "inherits": "lbase",
+            "inherits": "gcc-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "NTEST_BUILD_TESTS": "ON",
-                "VCPKG_TARGET_TRIPLET": "x64-linux"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_DEBUG": "-O0 --coverage -ggdb3 -fno-omit-frame-pointer",
+                "||.UName||_C_FLAGS_DEBUG": "-O0 --coverage -ggdb3 -fno-omit-frame-pointer",
+                "||.UName||_EXE_LINKER_FLAGS_DEBUG": "--coverage",
+                "||.UName||_SHARED_LINKER_FLAGS_DEBUG": "--coverage"
             }
         },
         {
             "name": "gcc-rel",
             "displayName": "x64 GCC Rel",
-            "inherits": "lbase",
+            "inherits": "gcc-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "NTEST_BUILD_TESTS": "ON",
-                "VCPKG_TARGET_TRIPLET": "x64-linux"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_RELEASE": "-ffast-math",
+                "||.UName||_C_FLAGS_RELEASE": "-ffast-math",
+                "||.UName||_EXE_LINKER_FLAGS_RELEASE": "-flto -s",
+                "||.UName||_SHARED_LINKER_FLAGS_RELEASE": "-flto -s"
+            }
+        },
+        {
+            "name": "gcc-prof",
+            "displayName": "x64 GCC Prof",
+            "inherits": "gcc-base",
+            "cacheVariables": {
+                "BUILD_SHARED_LIBS": false,
+                "CMAKE_BUILD_TYPE": "Profile",
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_PROFILE": "-pg -fno-omit-frame-pointer",
+                "||.UName||_C_FLAGS_PROFILE": "-pg -fno-omit-frame-pointer",
+                "||.UName||_EXE_LINKER_FLAGS_PROFILE": "-pg",
+                "||.UName||_SHARED_LINKER_FLAGS_PROFILE": "-pg"
             }
         }
     ],
@@ -36,13 +68,22 @@
             "name": "gcc-dev",
             "displayName": "x64 GCC",
             "jobs": 4,
-            "configurePreset": "gcc-dev"
+            "configurePreset": "gcc-dev",
+            "verbose": true
         },
         {
             "name": "gcc-rel",
             "displayName": "x64 GCC Rel",
             "jobs": 4,
-            "configurePreset": "gcc-rel"
+            "configurePreset": "gcc-rel",
+            "verbose": true
+        },
+        {
+            "name": "gcc-prof",
+            "displayName": "x64 GCC Prof",
+            "jobs": 4,
+            "configurePreset": "gcc-prof",
+            "verbose": true
         }
     ],
     "testPresets": [
@@ -58,6 +99,14 @@
             "name": "gcc-rel",
             "displayName": "x64 GCC Rel",
             "configurePreset": "gcc-rel",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "gcc-prof",
+            "displayName": "x64 GCC Prof",
+            "configurePreset": "gcc-prof",
             "output": {
                 "outputOnFailure": true
             }
@@ -97,6 +146,24 @@
                 {
                     "type": "test",
                     "name": "gcc-rel"
+                }
+            ]
+        },
+        {
+            "name": "gcc-prof",
+            "displayName": "x64 GCC Prof",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc-prof"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc-prof"
+                },
+                {
+                    "type": "test",
+                    "name": "gcc-prof"
                 }
             ]
         }

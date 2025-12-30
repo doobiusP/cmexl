@@ -16,11 +16,8 @@
             "inherits": "lbase",
             "cacheVariables": {
                 "VCPKG_TARGET_TRIPLET": "x64-mingw-static-dyn-rt",
-                "CMAKE_CXX_FLAGS_INIT": "-fno-omit-frame-pointer -fprofile-arcs -ftest-coverage -Wall -Wextra -Wpedantic -Werror",
-                "CMAKE_CXX_FLAGS_DEBUG_INIT": "-ggdb",
-                "CMAKE_EXE_LINKER_FLAGS_INIT": "-fprofile-arcs -ftest-coverage",
-                "CMAKE_SHARED_LINKER_FLAGS_INIT": "-fprofile-arcs -ftest-coverage",
-                "CMAKE_MODULE_LINKER_FLAGS_INIT": "-fprofile-arcs -ftest-coverage",
+                "||.UName||_CXX_FLAGS": "-Wall -Wextra -Wpedantic -Werror",
+                "||.UName||_C_FLAGS": "-Wall -Wextra -Wpedantic -Werror",
                 "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/x64-mingw.cmake"
             }
         },
@@ -32,7 +29,11 @@
             ],
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "NTEST_BUILD_TESTS": "ON"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_DEBUG": "-O0 -ggdb3 -fno-omit-frame-pointer --coverage",
+                "||.UName||_C_FLAGS_DEBUG": "-O0 -ggdb3 -fno-omit-frame-pointer --coverage",
+                "||.UName||_EXE_LINKER_FLAGS_DEBUG": "--coverage",
+                "||.UName||_SHARED_LINKER_FLAGS_DEBUG": "--coverage"
             }
         },
         {
@@ -43,7 +44,26 @@
             ],
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "NTEST_BUILD_TESTS": "ON"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_RELEASE": "-ffast-math -flto",
+                "||.UName||_C_FLAGS_RELEASE": "-ffast-math -flto",
+                "||.UName||_EXE_LINKER_FLAGS_RELEASE": "-flto -s",
+                "||.UName||_SHARED_LINKER_FLAGS_RELEASE": "-flto -s"
+            }
+        },
+        {
+            "name": "mingw-prof",
+            "displayName": "x64 MinGW Prof",
+            "inherits": [
+                "mingw-base"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Profile",
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS_PROFILE": "-pg -fno-omit-frame-pointer",
+                "||.UName||_C_FLAGS_PROFILE": "-pg -fno-omit-frame-pointer",
+                "||.UName||_EXE_LINKER_FLAGS_PROFILE": "-pg",
+                "||.UName||_SHARED_LINKER_FLAGS_PROFILE": "-pg"
             }
         }
     ],
@@ -52,13 +72,22 @@
             "name": "mingw-dev",
             "displayName": "x64 MinGW",
             "jobs": 4,
-            "configurePreset": "mingw-dev"
+            "configurePreset": "mingw-dev",
+            "verbose": true
         },
         {
             "name": "mingw-rel",
             "displayName": "x64 MinGW Rel",
             "jobs": 4,
-            "configurePreset": "mingw-rel"
+            "configurePreset": "mingw-rel",
+            "verbose": true
+        },
+        {
+            "name": "mingw-prof",
+            "displayName": "x64 MinGW Prof",
+            "jobs": 4,
+            "configurePreset": "mingw-prof",
+            "verbose": true
         }
     ],
     "testPresets": [
@@ -74,6 +103,14 @@
             "name": "mingw-rel",
             "displayName": "x64 MinGW Rel",
             "configurePreset": "mingw-rel",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "mingw-prof",
+            "displayName": "x64 MinGW Prof",
+            "configurePreset": "mingw-prof",
             "output": {
                 "outputOnFailure": true
             }
@@ -113,6 +150,24 @@
                 {
                     "type": "test",
                     "name": "mingw-rel"
+                }
+            ]
+        },
+        {
+            "name": "mingw-prof",
+            "displayName": "x64 MinGW Prof",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "mingw-prof"
+                },
+                {
+                    "type": "build",
+                    "name": "mingw-prof"
+                },
+                {
+                    "type": "test",
+                    "name": "mingw-prof"
                 }
             ]
         }

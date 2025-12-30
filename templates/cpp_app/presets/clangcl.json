@@ -17,8 +17,21 @@
             "cacheVariables": {
                 "CMAKE_GENERATOR_PLATFORM": "x64",
                 "CMAKE_GENERATOR_TOOLSET": "ClangCL",
-                "NTEST_BUILD_TESTS": "ON",
-                "VCPKG_TARGET_TRIPLET": "x64-win-llvm-static-md"
+                "||.UName||_BUILD_TESTS": "ON",
+                "||.UName||_CXX_FLAGS": "/W4 /WX /permissive- /MP",
+                "||.UName||_C_FLAGS": "/W4 /WX /permissive- /MP",
+                "||.UName||_EXE_LINKER_FLAGS": "/WX",
+                "||.UName||_SHARED_LINKER_FLAGS": "/WX",
+                "||.UName||_CXX_FLAGS_DEBUG": "/Od /Oy- /RTC1",
+                "||.UName||_C_FLAGS_DEBUG": "/Od /Oy- /RTC1",
+                "||.UName||_CXX_FLAGS_RELEASE": "/fp:fast",
+                "||.UName||_C_FLAGS_RELEASE": "/fp:fast",
+                "||.UName||_EXE_LINKER_FLAGS_DEBUG": "/DEBUG:FULL",
+                "||.UName||_SHARED_LINKER_FLAGS_DEBUG": "/DEBUG:FULL",
+                "||.UName||_CXX_FLAGS_PROFILE": "/Oy-",
+                "||.UName||_C_FLAGS_PROFILE": "/Oy-",
+                "||.UName||_EXE_LINKER_FLAGS_PROFILE": "/DEBUG:FULL",
+                "||.UName||_SHARED_LINKER_FLAGS_PROFILE": "/DEBUG:FULL"
             }
         }
     ],
@@ -28,14 +41,24 @@
             "displayName": "x64 ClangCL",
             "jobs": 4,
             "configurePreset": "clangcl",
-            "configuration": "Debug"
+            "configuration": "Debug",
+            "verbose": true
         },
         {
             "name": "clangcl-rel",
             "displayName": "x64 ClangCL Rel",
             "jobs": 4,
             "configurePreset": "clangcl",
-            "configuration": "Release"
+            "configuration": "Release",
+            "verbose": true
+        },
+        {
+            "name": "clangcl-prof",
+            "displayName": "x64 ClangCL Prof",
+            "jobs": 4,
+            "configurePreset": "clangcl",
+            "configuration": "Profile",
+            "verbose": true
         }
     ],
     "testPresets": [
@@ -53,6 +76,15 @@
             "displayName": "x64 ClangCL Rel",
             "configurePreset": "clangcl",
             "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "clangcl-prof",
+            "displayName": "x64 ClangCL Prof",
+            "configurePreset": "clangcl",
+            "configuration": "Profile",
             "output": {
                 "outputOnFailure": true
             }
@@ -92,6 +124,24 @@
                 {
                     "type": "test",
                     "name": "clangcl-rel"
+                }
+            ]
+        },
+        {
+            "name": "clangcl-prof",
+            "displayName": "x64 ClangCL Prof",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clangcl"
+                },
+                {
+                    "type": "build",
+                    "name": "clangcl-prof"
+                },
+                {
+                    "type": "test",
+                    "name": "clangcl-prof"
                 }
             ]
         }

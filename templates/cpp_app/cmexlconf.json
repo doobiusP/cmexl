@@ -16,16 +16,21 @@
                 "gcc-dev",
                 "clang-rel",
                 "mingw-rel",
-                "gcc-rel"
+                "gcc-rel",
+                "clang-prof",
+                "mingw-prof",
+                "gcc-prof"
             ]
         },
         {
             "name": "win",
             "workflows": [
-                "win-dev",
+                "msvc-dev",
                 "clangcl-dev",
-                "win-rel",
-                "clangcl-rel"
+                "msvc-rel",
+                "clangcl-rel",
+                "msvc-prof",
+                "clangcl-prof"
             ]
         }
     ]
